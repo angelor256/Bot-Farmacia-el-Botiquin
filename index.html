@@ -1,1 +1,841 @@
-new index.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Farmacia El Botiquín · Panel de Control del Bot</title>
+
+<!-- ============================================================
+     STACK: HTML5 + Tailwind CSS (CDN) + Vanilla JS (ES6+)
+     Iconos: FontAwesome 6 (CDN) + Google Fonts (Inter)
+     Todo el prototipo vive en este único archivo index.html
+============================================================ -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<script>
+  /* Extensión del tema Tailwind: paleta "Emerald" (salud/farmacia) */
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        colors: {
+          brand: {
+            50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',
+            400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',
+            800:'#065f46',900:'#064e3b'
+          }
+        },
+        boxShadow: {
+          soft: '0 4px 20px -2px rgba(16, 185, 129, 0.10), 0 2px 8px -2px rgba(0,0,0,0.05)',
+          card: '0 10px 40px -12px rgba(6, 78, 59, 0.18)',
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  /* ===================== CSS PROPIO (complementa a Tailwind) ===================== */
+  :root{
+    --wa-header:#075E54;         /* verde histórico cabecera WhatsApp      */
+    --wa-header-2:#128C7E;       /* degradado cabecera                     */
+    --wa-bg:#E5DDD5;             /* fondo característico del chat          */
+    --wa-bubble-in:#FFFFFF;      /* burbuja recibida                       */
+    --wa-bubble-out:#DCF8C6;     /* burbuja enviada                        */
+  }
+  body{ font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+
+  /* ---- Fondo tipo "doodle" sutil para el chat de WhatsApp ---- */
+  .wa-wallpaper{
+    background-color:var(--wa-bg);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='%23c9c2b8' fill-opacity='0.35'%3E%3Cpath d='M40 40h8v8h-8zM90 60h6v6h-6zM150 30l4 8h-8zM210 70a6 6 0 100 12 6 6 0 000-12zM60 140c8 0 8 12 0 12s-8-12 0-12zM130 120h10v4h-10zM190 150q6-10 12 0t-12 0zM30 210h6v6h-6zM100 220a5 5 0 1010 0 5 5 0 00-10 0zM170 230l6 10h-12zM230 200h8v8h-8zM240 120c6 0 6 10 0 10s-6-10 0-10zM120 180h6v10h-6z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* ---- Cola de "escribiendo..." (tres puntos animados) ---- */
+  .typing-dot{
+    width:7px;height:7px;border-radius:9999px;background:#9ca3af;
+    display:inline-block;animation:typingBounce 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2){animation-delay:.18s}
+  .typing-dot:nth-child(3){animation-delay:.36s}
+  @keyframes typingBounce{
+    0%,60%,100%{transform:translateY(0);opacity:.5}
+    30%{transform:translateY(-5px);opacity:1}
+  }
+
+  /* ---- Animación de entrada de las burbujas ---- */
+  .bubble-enter{ animation:bubbleIn .28s cubic-bezier(.34,1.56,.64,1) both; transform-origin:bottom left;}
+  .bubble-enter.out{ transform-origin:bottom right;}
+  @keyframes bubbleIn{ from{opacity:0; transform:translateY(8px) scale(.96);} to{opacity:1; transform:none;} }
+
+  /* ---- Toggle (interruptor) personalizado ---- */
+  .switch input{ position:absolute; opacity:0; width:0; height:0; }
+  .switch .track{
+    transition:all .28s cubic-bezier(.4,0,.2,1);
+  }
+  .switch .knob{
+    transition:all .28s cubic-bezier(.4,0,.2,1);
+  }
+  .switch input:checked ~ .track{ background:#059669; box-shadow:inset 0 0 0 1px #059669; }
+  .switch input:checked ~ .track .knob{ transform:translateX(20px); }
+  .switch input:focus-visible ~ .track{ outline:2px solid #34d399; outline-offset:2px; }
+
+  /* ---- Zona de arrastrar y soltar ---- */
+  .dropzone{ transition:all .2s ease; }
+  .dropzone.dragover{
+    border-color:#059669 !important; background:#ecfdf5 !important;
+    transform:scale(1.01); box-shadow:0 0 0 4px rgba(16,185,129,.15);
+  }
+
+  /* ---- Scrollbar fina para el chat ---- */
+  .thin-scroll::-webkit-scrollbar{ width:5px; }
+  .thin-scroll::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.18); border-radius:9999px; }
+  .thin-scroll::-webkit-scrollbar-track{ background:transparent; }
+
+  /* ---- Toast ---- */
+  #toast{ transition:transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s ease; }
+
+  /* ---- Texto multilínea dentro de las burbujas ---- */
+  .wa-text{ white-space:pre-line; word-break:break-word; }
+
+  /* ---- Marco del teléfono ---- */
+  .phone-frame{
+    background:linear-gradient(160deg,#1f2937 0%,#111827 60%,#0b1220 100%);
+    box-shadow:0 30px 60px -18px rgba(6,78,59,.45), 0 8px 24px -8px rgba(0,0,0,.35);
+  }
+  .phone-notch{
+    background:#0b1220;
+    box-shadow:inset 0 -2px 4px rgba(255,255,255,.04);
+  }
+</style>
+</head>
+
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+<!-- ======================= BARRA SUPERIOR ======================= -->
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-200 shadow-sm">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-soft flex items-center justify-center text-white text-xl">
+        <i class="fa-solid fa-prescription-bottle-medical"></i>
+      </div>
+      <div>
+        <h1 class="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight tracking-tight">
+          Farmacia <span class="text-brand-600">El Botiquín</span>
+        </h1>
+        <p class="text-xs text-gray-500 font-medium">Panel No-Code · Configuración del Asistente WhatsApp</p>
+      </div>
+    </div>
+    <div class="hidden md:flex items-center gap-2 text-xs font-semibold">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-brand-700 border border-emerald-200">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+        </span>
+        Bot conectado
+      </span>
+      <span class="px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+        <i class="fa-brands fa-whatsapp mr-1 text-brand-600"></i> +506 8888‑0000
+      </span>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= LAYOUT PRINCIPAL (60 / 40) ======================= -->
+<main class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 lg:gap-8 items-start">
+
+    <!-- ============================================================
+         COLUMNA IZQUIERDA — CONFIGURACIÓN (60% ⇒ col-span-3)
+    ============================================================ -->
+    <section class="xl:col-span-3 space-y-6" aria-label="Configuración del bot">
+
+      <!-- ---------- SECCIÓN A: REGLAS DE NEGOCIO (TOGGLES) ---------- -->
+      <article class="bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-brand-50/70 to-white flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+              <i class="fa-solid fa-sliders text-brand-600"></i> Sección A · Reglas de Negocio
+            </h2>
+            <p class="text-sm text-gray-500 mt-1">Activa o desactiva el comportamiento del bot. Estos ajustes alimentan al simulador de la derecha en tiempo real.</p>
+          </div>
+          <span class="shrink-0 text-[11px] font-bold uppercase tracking-wide bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full">No-Code</span>
+        </div>
+
+        <!-- Renderizado por JS desde la config TOGGLE_DEFS -->
+        <div id="toggles-container" class="divide-y divide-gray-100"></div>
+      </article>
+
+      <!-- ---------- SECCIÓN B: ZONA ARRASTRAR Y SOLTAR ---------- -->
+      <article class="bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-brand-50/70 to-white">
+          <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+            <i class="fa-solid fa-file-arrow-up text-brand-600"></i> Sección B · Listas de Precios
+          </h2>
+          <p class="text-sm text-gray-500 mt-1">Sube tus archivos <strong>PDF</strong> o <strong>Excel</strong> (.pdf, .xls, .xlsx). El backend los procesará para alimentar el catálogo del bot.</p>
+        </div>
+
+        <div class="p-6 space-y-5">
+          <!-- Dropzone -->
+          <div id="dropzone" tabindex="0" role="button" aria-label="Arrastra y suelta archivos aquí o haz clic para seleccionar"
+               class="dropzone cursor-pointer rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 hover:border-brand-400 hover:bg-brand-50/40 focus:outline-none focus:ring-4 focus:ring-brand-100 transition
+                      px-6 py-10 text-center select-none">
+            <input type="file" id="file-input" class="hidden" multiple accept=".pdf,.xls,.xlsx,csv" />
+            <div class="flex flex-col items-center gap-3 pointer-events-none">
+              <div class="w-14 h-14 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center text-2xl shadow-soft">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <p class="text-sm font-semibold text-gray-700">
+                Arrastra y suelta tus listas de precios aquí
+              </p>
+              <p class="text-xs text-gray-500">Formatos permitidos: <span class="font-semibold">PDF, XLS, XLSX, CSV</span> · Máx. 10&nbsp;MB por archivo</p>
+              <span class="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold text-brand-700 shadow-sm hover:shadow hover:border-brand-300 transition">
+                <i class="fa-solid fa-folder-open"></i> Explorar archivos
+              </span>
+            </div>
+          </div>
+
+          <!-- Lista de archivos subidos -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Archivos cargados</h3>
+              <span id="files-count" class="text-[11px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">0</span>
+            </div>
+            <ul id="files-list" class="space-y-2">
+              <!-- Items generados por JS -->
+            </ul>
+            <p id="files-empty" class="text-sm text-gray-400 italic px-1 py-3">Aún no has subido ninguna lista de precios.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- ---------- SECCIÓN C: GUARDAR CONFIGURACIÓN ---------- -->
+      <article class="bg-white rounded-xl shadow-card border border-gray-100 p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+              <i class="fa-solid fa-floppy-disk"></i>
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-gray-900">Sección C · Publicar Cambios</h2>
+              <p class="text-sm text-gray-500">Guarda la configuración y las listas para que el bot las aplique de inmediato.</p>
+            </div>
+          </div>
+          <button id="btn-save" type="button"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm
+                         bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600
+                         shadow-soft hover:shadow-card active:scale-[.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed">
+            <i id="btn-save-icon" class="fa-solid fa-check-double"></i>
+            <span id="btn-save-label">Guardar Configuración</span>
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================================================
+         COLUMNA DERECHA — SIMULADOR WHATSAPP (40% ⇒ col-span-2)
+    ============================================================ -->
+    <aside class="xl:col-span-2 xl:sticky xl:top-24" aria-label="Simulador de WhatsApp">
+      <div class="mb-3 flex items-center justify-between px-1">
+        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+          <i class="fa-brands fa-whatsapp text-2xl text-brand-600"></i> Simulador en Vivo
+        </h2>
+        <button id="btn-restart" type="button" title="Reiniciar conversación"
+                class="text-xs font-semibold text-gray-500 hover:text-brand-700 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-brand-300 shadow-sm transition">
+          <i class="fa-solid fa-rotate-left"></i> Reiniciar chat
+        </button>
+      </div>
+
+      <!-- Indicador de estado de la máquina de estados (debug elegante) -->
+      <div class="mb-3 px-1">
+        <span class="text-[11px] font-mono text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm">
+          Estado FSM:&nbsp;<b id="state-badge" class="text-brand-700">0 · Inicio</b>
+        </span>
+      </div>
+
+      <!-- ---------- MARCO DE TELÉFONO ---------- -->
+      <div class="phone-frame rounded-[2.4rem] p-2.5 mx-auto max-w-[400px]">
+        <div class="bg-black rounded-[2rem] overflow-hidden relative">
+
+          <!-- Barra de estado del "celular" -->
+          <div class="relative text-white text-[11px] font-semibold px-5 pt-2 pb-1 flex items-center justify-between bg-[#075E54]">
+            <span>22:14</span>
+            <div class="phone-notch absolute left-1/2 -translate-x-1/2 top-1 w-24 h-5 rounded-full"></div>
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i>
+            </span>
+          </div>
+
+          <!-- Cabecera de WhatsApp -->
+          <div class="bg-gradient-to-r from-[#075E54] to-[#128C7E] text-white px-3 py-2.5 flex items-center gap-3">
+            <i class="fa-solid fa-chevron-down opacity-80"></i>
+            <div class="w-9 h-9 rounded-full bg-white/20 ring-2 ring-white/40 flex items-center justify-center text-base overflow-hidden">
+              <i class="fa-solid fa-user-doctor"></i>
+            </div>
+            <div class="flex-1 leading-tight">
+              <p class="font-bold text-sm">Dr. Boti 💊</p>
+              <p class="text-[11px] text-emerald-100/90" id="wa-presence">en línea</p>
+            </div>
+            <div class="flex items-center gap-4 text-sm opacity-90">
+              <i class="fa-solid fa-video"></i><i class="fa-solid fa-phone"></i><i class="fa-solid fa-ellipsis-vertical"></i>
+            </div>
+          </div>
+
+          <!-- Cuerpo del chat -->
+          <div id="chat-window" class="wa-wallpaper thin-scroll overflow-y-auto px-3 py-4 space-y-2 h-[430px] sm:h-[470px]" role="log" aria-live="polite">
+            <!-- Burbujas generadas por JS -->
+          </div>
+
+          <!-- Input inferior estilo WhatsApp -->
+          <div class="bg-[#f0f0f0] px-2 py-2 flex items-end gap-2">
+            <div class="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-500 shrink-0">
+              <i class="fa-solid fa-face-smile"></i>
+            </div>
+            <form id="chat-form" class="flex-1 flex items-end gap-2">
+              <div class="flex-1 bg-white rounded-2xl px-3.5 py-2 shadow-sm flex items-center">
+                <input id="chat-input" type="text" autocomplete="off" placeholder="Escribe un mensaje"
+                       class="w-full text-sm outline-none bg-transparent text-gray-800 placeholder-gray-400" />
+              </div>
+              <button type="submit" aria-label="Enviar mensaje"
+                      class="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#008f72] active:scale-95 transition text-white shadow-md flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-paper-plane translate-x-[1px]"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-gray-500 mt-3 px-1 leading-relaxed">
+        <i class="fa-solid fa-circle-info text-brand-600 mr-1"></i>
+        Prueba el flujo: responde <b>1</b> o <b>2</b> (opción) → <b>1</b> o <b>2</b> (sucursal) → luego escribe lo que quieras: el bot simulará la IA usando tus toggles.
+      </p>
+    </aside>
+  </div>
+</main>
+
+<!-- ======================= TOAST NOTIFICATION ======================= -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-24 opacity-0 pointer-events-none">
+  <div class="flex items-center gap-3 bg-white border border-brand-200 shadow-card rounded-xl px-4 py-3 max-w-sm">
+    <div class="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-lg shrink-0">
+      <i class="fa-solid fa-circle-check"></i>
+    </div>
+    <div>
+      <p class="text-sm font-bold text-gray-900">¡Configuración guardada!</p>
+      <p class="text-xs text-gray-500">El bot de WhatsApp ya está respondiendo con tus nuevas reglas.</p>
+    </div>
+    <button id="toast-close" class="ml-2 text-gray-400 hover:text-gray-600" aria-label="Cerrar notificación">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ================================================================
+     JAVASCRIPT — Máquina de Estados del Chat + UI No-Code
+================================================================ -->
+<script>
+'use strict';
+
+/* ============================================================================
+ * ██ PARTE 1 — CONFIGURACIÓN DE LOS TOGGLES (SECCIÓN A)
+ * ==========================================================================*/
+const TOGGLE_DEFS = [
+  { id:'envios_domicilio', icon:'fa-truck-fast',    title:'Permitir envíos a domicilio', desc:'El bot ofrece delivery y pide la dirección del cliente.' },
+  { id:'ofrecer_genericos',icon:'fa-capsules',      title:'Ofrecer genéricos',           desc:'Cuando un medicamento no hay, el bot sugiere su equivalente genérico.' },
+  { id:'recetas_medicas',  icon:'fa-file-prescription', title:'Aceptar recetas médicas', desc:'El bot permite enviar fotos de receta para cotización.' },
+  { id:'macrobiotica',     icon:'fa-seedling',      title:'Catálogo macrobiótico',       desc:'Incluye suplementos y productos naturales en las respuestas.' },
+  { id:'fuera_de_linea',   icon:'fa-moon',          title:'Modo fuera de horario',       desc:'Fuera de horario, el bot responde con mensajes automáticos de espera.' },
+];
+
+/* Estado global de la interfaz (source of truth de los toggles) */
+const uiState = {
+  toggles: Object.fromEntries(TOGGLE_DEFS.map(t => [t.id, ['envios_domicilio','ofrecer_genericos'].includes(t.id)])),
+  files: [], // { id, name, size, type }
+};
+
+/** Renderiza los interruptores de la Sección A */
+function renderToggles(){
+  const wrap = document.getElementById('toggles-container');
+  wrap.innerHTML = TOGGLE_DEFS.map(t => `
+    <label class="switch flex items-center justify-between gap-4 px-6 py-4 hover:bg-brand-50/40 cursor-pointer transition-colors">
+      <span class="flex items-start gap-3.5">
+        <span class="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg shrink-0">
+          <i class="fa-solid ${t.icon}"></i>
+        </span>
+        <span>
+          <span class="block text-sm font-bold text-gray-800">${t.title}</span>
+          <span class="block text-xs text-gray-500 mt-0.5">${t.desc}</span>
+        </span>
+      </span>
+      <span class="relative shrink-0">
+        <input type="checkbox" data-toggle="${t.id}" ${uiState.toggles[t.id] ? 'checked':''}/>
+        <span class="track block w-11 h-6 rounded-full bg-gray-200 shadow-inner">
+          <span class="knob absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md"></span>
+        </span>
+      </span>
+    </label>
+  `).join('');
+
+  // Sincroniza el estado cada vez que el dueño mueve un interruptor
+  wrap.querySelectorAll('input[data-toggle]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      uiState.toggles[inp.dataset.toggle] = inp.checked;
+      // Feedback sutil: si el chat ya está en "IA Activa", avisamos que las reglas cambiaron
+      if (ChatFSM.state >= 3) {
+        ChatFSM.pushSystemNote(`⚙️ Regla actualizada: «${TOGGLE_DEFS.find(t=>t.id===inp.dataset.toggle).title}» → ${inp.checked?'ACTIVADA':'DESACTIVADA'}`);
+      }
+    });
+  });
+}
+
+/* ============================================================================
+ * ██ PARTE 2 — GESTIÓN DE ARCHIVOS (SECCIÓN B, DRAG & DROP SIMULADO)
+ * ==========================================================================*/
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+function humanSize(bytes){
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+function fileIcon(name){
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'pdf')  return { cls:'fa-file-pdf text-red-500 bg-red-50' };
+  if (ext === 'csv')  return { cls:'fa-file-csv text-amber-600 bg-amber-50' };
+  return { cls:'fa-file-excel text-emerald-600 bg-emerald-50' }; // xls/xlsx
+}
+
+function addFiles(fileList){
+  [...fileList].forEach(f => {
+    // Validación suave del tipo permitido
+    if (!/\.(pdf|xlsx?|csv)$/i.test(f.name)) {
+      console.warn('Archivo ignorado (formato no soportado):', f.name);
+      return;
+    }
+    uiState.files.push({ id: crypto.randomUUID(), name: f.name, size: f.size });
+  });
+  renderFiles();
+}
+
+function removeFile(id){
+  uiState.files = uiState.files.filter(f => f.id !== id);
+  renderFiles();
+}
+
+function renderFiles(){
+  const list  = document.getElementById('files-list');
+  const empty = document.getElementById('files-empty');
+  document.getElementById('files-count').textContent = uiState.files.length;
+  empty.classList.toggle('hidden', uiState.files.length > 0);
+
+  list.innerHTML = uiState.files.map(f => {
+    const ic = fileIcon(f.name);
+    return `
+    <li class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:border-brand-300 hover:bg-white hover:shadow-soft transition group">
+      <span class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 ${ic.cls}">
+        <i class="fa-solid ${ic.cls.includes('pdf')?'fa-file-pdf':ic.cls.includes('csv')?'fa-file-csv':'fa-file-excel'}"></i>
+      </span>
+      <span class="flex-1 min-w-0">
+        <span class="block text-sm font-semibold text-gray-800 truncate">${f.name}</span>
+        <span class="block text-[11px] text-gray-500">${humanSize(f.size)} · listo para procesar</span>
+      </span>
+      <button data-remove="${f.id}" title="Eliminar archivo"
+        class="w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+        <i class="fa-solid fa-trash-can"></i>
+      </button>
+    </li>`;
+  }).join('');
+
+  list.querySelectorAll('[data-remove]').forEach(btn =>
+    btn.addEventListener('click', () => removeFile(btn.dataset.remove)));
+}
+
+// Eventos del Dropzone (drag & drop + clic)
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') fileInput.click(); });
+fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value=''; });
+['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault(); dropzone.classList.add('dragover');
+}));
+['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault(); dropzone.classList.remove('dragover');
+}));
+dropzone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+/* ============================================================================
+ * ██ PARTE 3 — BOTÓN GUARDAR (SECCIÓN C) + RECOLECCIÓN PARA EL BACKEND
+ * ==========================================================================*/
+const btnSave = document.getElementById('btn-save');
+
+/**
+ * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+ * ██ 1) AQUÍ SE RECOLECTAN TODOS LOS DATOS QUE VIAJAN AL BACKEND:
+ *    - Estado de cada toggle (reglas de negocio)
+ *    - Metadatos de los archivos de listas de precios
+ *    Este objeto JSON es exactamente lo que habría que POSTear.
+ * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+ */
+function collectConfigPayload(){
+  return {
+    bot_name: 'Dr. Boti',
+    pharmacy: 'Farmacia El Botiquín',
+    business_rules: { ...uiState.toggles },          // ← datos de los toggles
+    price_lists: uiState.files.map(f => ({ name:f.name, size:f.size })), // ← archivos (luego se subirían vía multipart/form-data)
+    saved_at: new Date().toISOString(),
+  };
+}
+
+btnSave.addEventListener('click', async () => {
+  // --- Estado "Cargando..." ---
+  btnSave.disabled = true;
+  document.getElementById('btn-save-icon').className = 'fa-solid fa-circle-notch fa-spin';
+  document.getElementById('btn-save-label').textContent = 'Cargando...';
+
+  const payload = collectConfigPayload();
+
+  /* ════════════════════════════════════════════════════════════════════════
+   *  ██████  AQUI CONECTAR CON API PYTHON  ██████
+   *  Sustituir el setTimeout simulado por una llamada real, por ejemplo:
+   *
+   *  const res = await fetch('https://api.elbotiquin.com/config', {
+   *      method: 'POST',
+   *      headers: { 'Content-Type': 'application/json' },
+   *      body: JSON.stringify(payload)   // payload = toggles + archivos
+   *  });
+   *  (Los PDF/Excel se enviarían en un segundo request FormData/multipart.)
+   * ════════════════════════════════════════════════════════════════════════ */
+  console.log('[PAYLOAD → BACKEND PYTHON]', payload);
+  await new Promise(r => setTimeout(r, 1600)); // simulación de latencia de red
+
+  // --- Restaurar botón + mostrar Toast de éxito ---
+  btnSave.disabled = false;
+  document.getElementById('btn-save-icon').className = 'fa-solid fa-check-double';
+  document.getElementById('btn-save-label').textContent = 'Guardar Configuración';
+  showToast();
+});
+
+/* --- Toast notification --- */
+const toast = document.getElementById('toast');
+let toastTimer = null;
+function showToast(){
+  clearTimeout(toastTimer);
+  toast.classList.remove('translate-y-24','opacity-0','pointer-events-none');
+  toastTimer = setTimeout(hideToast, 4200);
+}
+function hideToast(){
+  toast.classList.add('translate-y-24','opacity-0','pointer-events-none');
+}
+document.getElementById('toast-close').addEventListener('click', hideToast);
+
+/* ============================================================================
+ * ██ PARTE 4 — MÁQUINA DE ESTADOS DEL SIMULADOR WHATSAPP (LÓGICA CRÍTICA)
+ * ----------------------------------------------------------------------------
+ *  La conversación emula el flujo real ANTES de que la IA tome el control:
+ *
+ *   ESTADO 0 · INICIO ──── Al cargar, el bot saluda con el menú de opciones.
+ *      │                   (espera un 1–5 digitado por el usuario)
+ *      ▼
+ *   ESTADO 1 · ESPERANDO OPCIÓN
+ *      │   "1" (compra) o "2" (consulta) → pregunta por la sucursal
+ *      ▼
+ *   ESTADO 2 · ESPERANDO SUCURSAL
+ *      │   "1" (Pavas Centro) o "2" (Lomas del Río) → confirmación
+ *      ▼
+ *   ESTADO 3 · IA ACTIVA
+ *          Cualquier mensaje activa la respuesta simulada de IA,
+ *          contextualizada con los toggles de la columna izquierda.
+ *          ⟶ En producción, desde aquí el BACKEND Python toma la conversación.
+ * ==========================================================================*/
+const ChatFSM = (() => {
+
+  /* ---------- Textos oficiales del flujo ---------- */
+  const MSG_WELCOME =
+`😊 Soy Dr. Boti, asistente virtual de Farmacia El Botiquín. 💙🧡
+
+Para ayudarle con lo que necesita, por favor digite el número de la opción correspondiente:
+
+1️⃣ Compra de productos
+2️⃣ Consulta Farmacéutica
+3️⃣ Macrobiótica y Suplementos
+4️⃣ Sugerencias y mejoras de servicio
+5️⃣ Horarios y direcciones de nuestras sucursales
+
+Será un gusto ayudarle.`;
+
+  const MSG_BRANCHES =
+`¡Con mucho gusto! 😊💙
+
+¿En cuál de nuestras sucursales desea realizar su pedido?
+
+1️⃣ Pavas Centro
+2️⃣ Lomas del Río
+
+Por favor, digite 1 o 2 para continuar con su pedido. 💊`;
+
+  const BRANCH_NAMES = { '1':'Pavas Centro', '2':'Lomas del Río' };
+
+  /* ---------- Referencias al DOM ---------- */
+  const win       = document.getElementById('chat-window');
+  const form      = document.getElementById('chat-form');
+  const input     = document.getElementById('chat-input');
+  const badge     = document.getElementById('state-badge');
+  const presence  = document.getElementById('wa-presence');
+
+  /* ---------- Variables internas de la FSM ---------- */
+  let state = 0;            // 0..3 según el diagrama de arriba
+  let selectedOption = null;// qué eligió el usuario en el Estado 1
+  let selectedBranch = null;// qué sucursal eligió en el Estado 2
+  let busy = false;         // evita spam mientras el bot "escribe"
+  let sessionId = null;     // id de sesión que se enviaría al backend en Estado 3
+
+  const STATE_LABELS = ['0 · Inicio','1 · Esperando Opción','2 · Esperando Sucursal','3 · IA Activa ✨'];
+
+  function setState(s){
+    state = s;
+    badge.textContent = STATE_LABELS[s];
+    badge.className = s >= 3 ? 'text-amber-600' : 'text-brand-700';
+  }
+
+  /* ---------- Utilidades de render ---------- */
+  function scrollDown(){ win.scrollTop = win.scrollHeight; }
+  function nowTime(){
+    const d = new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+
+  /** Inserta una burbuja (in = recibida / out = enviada) */
+  let __lastBotText = '';      // último texto del bot (expuesto solo para pruebas)
+  function pushBubble(text, who){
+    if (who === 'in') __lastBotText = text;
+    const row = document.createElement('div');
+    row.className = `flex ${who==='out' ? 'justify-end' : 'justify-start'} bubble-enter ${who==='out'?'out':''}`;
+    const radius = who === 'out' ? '8px 0 8px 8px' : '0 8px 8px 8px';
+    row.innerHTML = `
+      <div class="relative max-w-[85%] px-3 py-2 shadow-sm text-[13.5px] leading-snug"
+           style="border-radius:${radius}; background:${who==='out' ? 'var(--wa-bubble-out)' : 'var(--wa-bubble-in)'}">
+        <span class="wa-text">${escapeHtml(text)}</span>
+        <span class="inline-block text-[10px] text-gray-400 ml-2 align-bottom float-right mt-1.5">
+          ${nowTime()} ${who==='out' ? '<i class="fa-solid fa-check-double text-sky-500 ml-0.5"></i>' : ''}
+        </span>
+      </div>`;
+    win.appendChild(row);
+    scrollDown();
+  }
+
+  /** Nota centrada del sistema (ej. cambios de reglas en vivo) */
+  function pushSystemNote(text){
+    const row = document.createElement('div');
+    row.className = 'flex justify-center bubble-enter';
+    row.innerHTML = `<span class="text-[10.5px] text-gray-600 bg-white/80 rounded-full px-3 py-1 shadow-sm text-center max-w-[90%]">${escapeHtml(text)}</span>`;
+    win.appendChild(row); scrollDown();
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /** Muestra la cola "escribiendo..." durante `ms` y luego ejecuta `done` */
+  function showTyping(ms, done){
+    presence.textContent = 'escribiendo…';
+    const row = document.createElement('div');
+    row.className = 'flex justify-start bubble-enter';
+    row.innerHTML = `
+      <div class="rounded-lg rounded-tl-none px-3.5 py-3 shadow-sm" style="background:var(--wa-bubble-in)">
+        <span class="typing-dot"></span> <span class="typing-dot"></span> <span class="typing-dot"></span>
+      </div>`;
+    win.appendChild(row); scrollDown();
+    setTimeout(() => {
+      row.remove();
+      presence.textContent = 'en línea';
+      done();
+    }, ms);
+  }
+
+  /** El bot responde tras una pequeña pausa "humana" */
+  function botSay(text, delay = 900){
+    busy = true;
+    showTyping(delay, () => { pushBubble(text, 'in'); busy = false; });
+  }
+
+  /* ---------- Transiciones por estado ---------- */
+
+  /** ESTADO 1 → 2 : el usuario eligió producto/consulta */
+  function handleOptionChoice(msg){
+    if (msg === '1' || msg === '2'){
+      selectedOption = msg === '1' ? 'Compra de productos' : 'Consulta Farmacéutica';
+      setState(2);
+      botSay(MSG_BRANCHES);
+    } else if (msg === '3'){
+      botSay(`¡Excelente elección! 🌿\n\nla opción 3️⃣ «Macrobiótica y Suplementos» está ${uiState.toggles.macrobiotica ? 'disponible en nuestro catálogo' : 'temporalmente deshabilitada por el administrador'}.\n\nCuénteme, ¿qué suplemento o producto natural busca? 😊`);
+    } else if (msg === '4'){
+      botSay('Muchas gracias por ayudarnos a mejorar 🙏\n\nEscriba su sugerencia y el equipo de El Botiquín la revisará personalmente. 💙');
+    } else if (msg === '5'){
+      botSay(`📍 *Nuestras sucursales*\n\n🏥 Pavas Centro — Frente a la feria del farmer, L-20\n🏥 Lomas del Río — 100 m sur de la entrada principal\n\n🕐 Lun–Sáb 7:00–22:00 · Dom 8:00–20:00\n\nDigite 1 o 2 para hacer un pedido en una de ellas. 💊`);
+      setState(2); // queda a la espera de la sucursal
+    } else {
+      botSay('Disculpe, no entendí 😅. Por favor digite el número de la opción correspondiente:\n\n1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones');
+    }
+  }
+
+  /** ESTADO 2 → 3 : el usuario eligió sucursal → se activa la IA */
+  function handleBranchChoice(msg){
+    if (msg === '1' || msg === '2'){
+      selectedBranch = BRANCH_NAMES[msg];
+      sessionId = 'wa-' + crypto.randomUUID(); // ← nace la sesión que el backend Python continuaría
+      setState(3);
+      botSay(`Perfecto! 😊 Será un gusto atenderle desde nuestra Sucursal ${selectedBranch}. 💙`);
+    } else {
+      botSay('Por favor digite 1️⃣ Pavas Centro o 2️⃣ Lomas del Río para continuar con su pedido. 💊');
+    }
+  }
+
+  /**
+   * ESTADO 3 : IA ACTIVA (simulación local).
+   *
+   * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+   * ██ 2) AQUI CONECTAR CON API PYTHON — PUNTO DE TOMA DE CONTROL:
+   *    Cuando la FSM alcanza state === 3, en producción este mensaje NO
+   *    debería responderse con simulateAIResponse(). El frontend debe:
+   *
+   *      await fetch('https://api.elbotiquin.com/chat', {
+   *        method: 'POST',
+   *        headers: {'Content-Type':'application/json'},
+   *        body: JSON.stringify({
+   *          session_id: sessionId,     // generado abajo al alcanzar Estado 3
+   *          user_message: msg,
+   *          branch: selectedBranch,
+   *          option: selectedOption,
+   *          business_rules: uiState.toggles   // ← mismos toggles de la Sección A
+   *        })
+   *      })
+   *      // y renderizar la respuesta del agente IA con pushBubble(...,'in')
+   *
+   *    Aquí simulamos localmente para que el prototipo sea 100% funcional.
+   * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+   */
+  function handleAIMessage(msg){
+    busy = true;
+    showTyping(1400, () => {
+      pushBubble(simulateAIResponse(msg), 'in');
+      busy = false;
+    });
+  }
+
+  /** Respuesta simulada de la IA, sensible a los toggles configurados */
+  function simulateAIResponse(userMsg){
+    const t = uiState.toggles;
+    const mentionsMed = /(medic|pastill|tableta|ibuprofeno|acetaminof|paracetamol|amoxi|aspirina|jarabe)/i.test(userMsg);
+    const mentionsDeliv = /(env[ií]o|domicilio|delivery|entrega|env[ií]arme)/i.test(userMsg);
+    const mentionsNatural = /(vitamina|suplemento|macrobi|natural|colageno|hierba|herbolar)/i.test(userMsg);
+    const lower = userMsg.toLowerCase();
+
+    let reply = `Gracias por su mensaje en Sucursal ${selectedBranch} (${selectedOption}). 💙`;
+
+    // --- Contexto de medicamento solicitado ---
+    if (mentionsMed){
+      reply += `\n\nHe consultado nuestro catálogo y tengo disponibilidad inmediata 💊.`;
+      if (t.ofrecer_genericos){
+        reply += `\n✨ También puedo ofrecerle la versión GENÉRICA equivalente, con el mismo principio activo y un ahorro aproximado del 30%. ¿Le interesa?`;
+      } else {
+        reply += `\nLe comparto únicamente la marca comercial disponible en esta ocasión.`;
+      }
+      if (t.recetas_medicas){
+        reply += `\n📷 Si su medicamento requiere receta, puede enviarme una foto aquí y la validamos por usted.`;
+      }
+    }
+
+    // --- Contexto macrobiótico / suplementos ---
+    if (mentionsNatural){
+      reply += t.macrobiotica
+        ? `\n\n🌿 ¡Claro! Nuestra línea macrobiótica incluye vitaminas, colágeno y suplementos naturales. ¿Busca algo para energía, defensas o digestión?`
+        : `\n\nLo siento, la sección macrobiótica y de suplementos está temporalmente deshabilitada en la configuración actual del bot. 🌿❌`;
+    }
+
+    // --- Contexto de envío a domicilio ---
+    if (mentionsDeliv){
+      reply += t.envios_domicilio
+        ? `\n\n🛵 ¡Sí hacemos envíos a domicilio! Con un costo de ₡1.500 dentro de ${selectedBranch === 'Pavas Centro' ? 'Pavas' : 'Lomas del Río'} y entrega en 90 minutos. Envíeme su ubicación exacta para coordinar.`
+        : `\n\n😔 En este momento los envíos a domicilio están deshabilitados en la farmacia. Puede recoger su pedido directamente en ${selectedBranch} con gusto.`;
+    }
+
+    // --- Recetas médicas: nota cuando están deshabilitadas (pedido de medicamento) ---
+    if (mentionsMed && !t.recetas_medicas){
+      reply += `\n\nℹ️ Nota: la carga de recetas médicas está deshabilitada por el administrador en este momento.`;
+    }
+
+    // --- Modo fuera de horario ---
+    if (t.fuera_de_linea){
+      reply += `\n\n🌙 Recuerde que estamos en modo "fuera de horario": sus datos quedan registrados y le responderemos apenas abramos.`;
+    }
+
+    // --- Mensaje genérico sin palabras clave ---
+    if (!mentionsMed && !mentionsDeliv && !mentionsNatural && !lower.includes('gracias')){
+      reply += `\n\nCuénteme con detalle: ¿qué producto o servicio necesita hoy? Puedo ayudarle con medicamentos 💊, genéricos${t.macrobiotica?', suplementos naturales 🌿':''}${t.envios_domicilio?', envíos a domicilio 🛵':''} y más.`;
+    }
+
+    if (lower.includes('gracias')) reply += `\n\n¡Con mucho placer! Es un gusto servirle. Que tenga excelente día. 😊💙🧡`;
+
+    /* ════════════════════════════════════════════════════════════════════
+     *  ⟴ En producción: reemplazar TODO el cuerpo de esta función por la
+     *    llamada a la API Python del LLM/RAG (ver comentario superior).
+     * ════════════════════════════════════════════════════════════════════ */
+    return reply;
+  }
+
+  /* ---------- Entrada del usuario ---------- */
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const msg = input.value.trim();
+    if (!msg || busy) return;
+    input.value = '';
+    pushBubble(msg, 'out');
+
+    /* Tabla de transiciones de la FSM */
+    switch (state){
+      case 0:                              // nunca debería ocurrir (el saludo dispara a 1)
+      case 1: handleOptionChoice(msg); break;
+      case 2: handleBranchChoice(msg); break;
+      case 3: handleAIMessage(msg); break; // ← IA ACTIVA (backend tomaría el control)
+    }
+  });
+
+  /* ---------- Inicialización / reinicio ---------- */
+  function boot(){
+    win.innerHTML = '';
+    selectedOption = selectedBranch = null;
+    sessionId = null;
+    busy = false;
+    setState(0);                 // ESTADO 0 · Inicio
+    // El bot envía automáticamente el mensaje de bienvenida y luego
+    // pasa al Estado 1 (esperando que el usuario digite una opción).
+    setTimeout(() => {
+      pushBubble(MSG_WELCOME, 'in');
+      setState(1);
+    }, 600);
+  }
+
+  document.getElementById('btn-restart').addEventListener('click', boot);
+
+  // API pública mínima (nota de sistema en vivo + pruebas unitarias)
+  return {
+    get state(){ return state; },
+    pushSystemNote,
+    _test: { boot, send(msg){ pushBubble(msg,'out'); switch(state){
+                case 0: case 1: handleOptionChoice(msg); break;
+                case 2: handleBranchChoice(msg); break;
+                case 3: handleAIMessage(msg); break; } },
+             lastReply: () => ({ get text(){ return __lastBotText; } }) },
+  };
+})();
+
+/* ============================================================================
+ * ██ ARRANQUE DE LA INTERFAZ
+ * ==========================================================================*/
+renderToggles();
+renderFiles();
+</script>
+</body>
+</html>
