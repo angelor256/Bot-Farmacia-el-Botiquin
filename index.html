@@ -278,8 +278,8 @@ const ChatFSM = (() => {
     apiKey  : 'AQ.Ab8RN6Imc2yYrqPUIxQJ1uDvW24CDZi_87rMVT6DM8nDG26GMg',
     proxyUrl: '',
     models  : [
-      { id:'gemini-2.5-flash',      label:'Gemini 2.5 Flash' },       // principal
-      { id:'gemini-2.5-flash-lite', label:'Gemini 2.5 Flash-Lite' },  // respaldo
+      { id:'gemini-3.8-flash',       label:'Gemini 3.8 Flash' },       // principal
+      { id:'gemini-3.5-flash-lite',  label:'Gemini 3.5 Flash-Lite' },  // respaldo
     ],
     temperature: 0.4,
     maxOutputTokens: 800,
@@ -382,7 +382,7 @@ Si preguntan algo ajeno a la farmacia, redirige amablemente.`;
     const body = JSON.stringify({
       system_instruction: { parts: [{ text: buildSystemPrompt() }] },
       contents,
-      generationConfig: { temperature: GEMINI_CONFIG.temperature, maxOutputTokens: GEMINI_CONFIG.maxOutputTokens, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { maxOutputTokens: GEMINI_CONFIG.maxOutputTokens, thinkingConfig: { thinkingLevel: 'low' } },
     });
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), GEMINI_CONFIG.timeoutMs);
