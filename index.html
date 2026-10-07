@@ -577,6 +577,74 @@ Por favor, digite 1 o 2 para continuar con su pedido. 💊`;
 
   const BRANCH_NAMES = { '1':'Pavas Centro', '2':'Lomas del Río' };
 
+  /* ============================================================================
+   * ██ CONFIGURACIÓN DE GEMINI (Google AI Studio) — IA REAL DEL BOT
+   * ----------------------------------------------------------------------------
+   * PASOS PARA ACTIVARLA:
+   *   1. Entre a https://aistudio.google.com → "Get API key" → "Create API key".
+   *      (También sirve la de https://makersuite.google.com/app/apikey)
+   *   2. Copie la clave (empieza por "AIza...") y péguela en apiKey abajo,
+   *      reemplazando el texto 'PEGAR_API_KEY_AQUI'.
+   *   3. Guarde el archivo y sívalo por http:// (extensión "Live Server" de VS
+   *      Code o GitHub Pages). Desde file:// el navegador bloquea la llamada.
+   * ¡Listo! A partir de ahí, el Estado 3 (IA Activa) responde con Gemini real
+   * en lugar de la simulación local. Sin clave, todo sigue funcionando en demo.
+   *
+   * ⚠️ SEGURIDAD: una API key visible en el HTML solo es aceptable para un
+   * prototipo/demos internas. Para producción, mueva la llamada a Gemini a un
+   * backend Python (FastAPI/Flask) que guarde la key en una variable de
+   * entorno — el frontend nunca debe conocerla. Ver comentario ▓▓ en
+   * handleAIMessage().
+   * ==========================================================================*/
+  const GEMINI_CONFIG = {
+    apiKey: 'AQ.Ab8RN6IfzlU9CR0xIjzxObOVnAJVU4sW_1BBS44sUH87_yO3hQ',                                  // ← pegue su clave aquí
+    model : 'gemini-2.0-flash',                                    // rápido y gratis en la capa free
+    temperature: 0.4,                                              // menos creatividad, más precisión
+    isLive(){ return this.apiKey && this.apiKey !== 'PEGAR_API_KEY_AQUI'; },
+  };
+
+  /** System prompt: le "inyecta" a Gemini la personalidad y las reglas del panel */
+  function buildGeminiSystemPrompt(){
+    const t = uiState.toggles;
+    return `Eres "Dr. Boti", el asistente virtual de la Farmacia El Botiquín (Costa Rica).
+  Personalidad: cálido, profesional, usa emojis moderadamente y cierra frases con 💙🧡 cuando salude o se despida. Responde SIEMPRE en español costarricense, breve (máximo 5 líneas por mensaje), formato WhatsApp (puedes usar *negritas*).
+  REGLAS DE NEGOCIO ACTUALMENTE ACTIVADAS POR EL DUEÑO (panel No-Code):
+  - Envíos a domicilio: ${t.envios_domicilio ? 'ACTIVADOS (ofrece delivery, cobra ₡1.500, pide dirección)' : 'DESACTIVADOS (no ofrezcas delivery; ofrece recogida en sucursal)'}
+  - Ofrecer genéricos: ${t.ofrecer_genericos ? 'ACTIVADOS (sugiere equivalente genérico con ~30% de ahorro)' : 'DESACTIVADOS (solo marca comercial)'}
+  - Aceptar recetas médicas por foto: ${t.recetas_medicas ? 'ACTIVADOS' : 'DESACTIVADOS'}
+  - Catálogo macrobiótico/suplementos: ${t.macrobiotica ? 'ACTIVO' : 'DESACTIVADO'}
+  - Modo fuera de horario: ${t.fuera_de_linea ? 'ACTIVO (avisa que responderán al abrir)' : 'DESACTIVADO'}
+  Sucursal actual del cliente: ${selectedBranch || 'sin definir'}. Contexto: ${selectedOption || 'sin definir'}.
+  Límites: no des dosis ni diagnósticos médicos; sugiere consultar al farmacéutico. Si te preguntan algo fuera de la farmacia, redirige amablemente al menú.`;
+  }
+
+  /** Llama a la API REST de Gemini y devuelve el texto de respuesta */
+  async function askGemini(userMsg){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${GEMINI_CONFIG.apiKey}`;
+    const body = {
+      system_instruction: { parts: [{ text: buildGeminiSystemPrompt() }] },
+      contents: [{ role: 'user', parts: [{ text: userMsg }] }],
+      generationConfig: {
+        temperature: GEMINI_CONFIG.temperature,
+        maxOutputTokens: 400,
+      },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Gemini HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('')?.trim();
+    if (!text) throw new Error('Respuesta vacía de Gemini');
+    return text;
+  }
+
+  /* Saludo cálido para "reglas conversacionales" (hola, buenos días, gracias…) */
+  const GREETING_RE  = /^(hola|holi|buenas|buen[oa]s?\s*(d[ií]as|tardes|noches)|hey|hi|saludos?)\b/i;
+  const THANKS_RE    = /\b(gracias|gracias\s*dr|muchas\s*gracias)\b/i;
+
   /* ---------- Referencias al DOM ---------- */
   const win       = document.getElementById('chat-window');
   const form      = document.getElementById('chat-form');
@@ -662,12 +730,25 @@ Por favor, digite 1 o 2 para continuar con su pedido. 💊`;
 
   /* ---------- Transiciones por estado ---------- */
 
+  /* ── Reglas conversacionales de cortesía ─────────────────────────────
+   * Antes de aplicar la "respuesta por defecto" (Disculpe, no entendí…),
+   * detectamos saludos y agradecimientos. Un cliente que escribe "hola"
+   * NUNCA debe recibir un mensaje de error: es mala UX y además delata
+   * un bot rígido. En producción, estas dos ramas serían simplemente el
+   * primer prompt enviado a Gemini (ver bloque ▓▓ de conexión).        */
+  function isGreeting(msg){ return GREETING_RE.test(msg.trim()); }
+  function isThanks(msg){ return THANKS_RE.test(msg.trim()); }
+
   /** ESTADO 1 → 2 : el usuario eligió producto/consulta */
   function handleOptionChoice(msg){
     if (msg === '1' || msg === '2'){
       selectedOption = msg === '1' ? 'Compra de productos' : 'Consulta Farmacéutica';
       setState(2);
       botSay(MSG_BRANCHES);
+    } else if (isGreeting(msg)){                       // ← "hola", "buenos días", etc.
+      botSay(`¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle con lo que necesita, por favor digite el número de la opción correspondiente:\n\n1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales`);
+    } else if (isThanks(msg)){                        // ← "gracias"
+      botSay('¡Con mucho placer! Es un gusto servirle. Que tenga excelente día. 😊💙🧡');
     } else if (msg === '3'){
       botSay(`¡Excelente elección! 🌿\n\nla opción 3️⃣ «Macrobiótica y Suplementos» está ${uiState.toggles.macrobiotica ? 'disponible en nuestro catálogo' : 'temporalmente deshabilitada por el administrador'}.\n\nCuénteme, ¿qué suplemento o producto natural busca? 😊`);
     } else if (msg === '4'){
@@ -717,14 +798,36 @@ Por favor, digite 1 o 2 para continuar con su pedido. 💊`;
    * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
    */
   function handleAIMessage(msg){
+    /* ════════════════════════════════════════════════════════════════════
+     * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+     * ██ CONEXIÓN DIRECTA CON GEMINI (Google AI Studio) — desde este mismo
+     * ██ navegador, sin backend intermedio. Ya está implementada abajo en
+     * ██ askGemini(). Solo necesita 2 cosas:
+     * ██   1) Poner su API key en GEMINI_CONFIG.apiKey (líneas de arriba).
+     * ██   2) Servir el HTML por http:// (Live Server / GitHub Pages);
+     * ██      con file:// el navegador bloquea la llamada CORS.
+     * ██ Si GEMINI_CONFIG.apiKey sigue siendo 'PEGAR_API_KEY_AQUI', el bot
+     * ██ usa la simulación local (simulateAIResponse) como fallback.
+     * ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
     busy = true;
-    showTyping(1400, () => {
-      pushBubble(simulateAIResponse(msg), 'in');
+    showTyping(700, async () => {
+      let reply;
+      if (GEMINI_CONFIG.isLive()){
+        try {
+          reply = await askGemini(msg);
+        } catch (err) {
+          console.error('[Gemini] error:', err);
+          reply = 'Ups, hubo un problema al conectar con mi cerebro IA 😅. Reintente en unos segundos o escriba a la farmacia directamente.';
+        }
+      } else {
+        reply = simulateAIResponse(msg); // modo demo sin API key
+      }
+      pushBubble(reply, 'in');
       busy = false;
     });
   }
 
-  /** Respuesta simulada de la IA, sensible a los toggles configurados */
+  /** Respuesta simulada de la IA (modo demo), sensible a los toggles configurados */
   function simulateAIResponse(userMsg){
     const t = uiState.toggles;
     const mentionsMed = /(medic|pastill|tableta|ibuprofeno|acetaminof|paracetamol|amoxi|aspirina|jarabe)/i.test(userMsg);
