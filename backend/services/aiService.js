@@ -244,7 +244,13 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
 
   const plan = [];
   const P = config.ai.providers;
-  if (P.gemini.enabled) P.gemini.models.forEach((m) => plan.push({ run: () => callGemini(P.gemini, m, systemPrompt, contents), provider: 'gemini', model: m }));
+  /* Validación de formato ANTES de llamar a la red: las claves reales de la API
+   * de Gemini empiezan con "AIza". Una clave "AQ..." es un token OAuth/Apps-Script
+   * pegado por error → SIEMPRE devuelve 401 y hacía caer el bot al fallback en
+   * cada pregunta libre (causa raíz de "cuando pregunto algo no responde"). */
+  if (P.gemini.enabled && !/^AIza/.test(P.gemini.apiKey || '')) {
+    log.warn('[ai] GEMINI_API_KEY tiene un formato inválido (debe empezar con "AIza…"). Se omite Gemini en esta ejecución. Revisa backend/.env.');
+  } else if (P.gemini.enabled) P.gemini.models.forEach((m) => plan.push({ run: () => callGemini(P.gemini, m, systemPrompt, contents), provider: 'gemini', model: m }));
   if (P.groq.enabled) P.groq.models.forEach((m) => plan.push({ run: () => callOpenAiCompatible(P.groq, m, messages), provider: 'groq', model: m }));
   if (P.openrouter.enabled) P.openrouter.models.forEach((m) => plan.push({ run: () => callOpenAiCompatible(P.openrouter, m, messages), provider: 'openrouter', model: m }));
 
@@ -312,13 +318,27 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
   return { text: defaultFallback(), provider: 'fallback-local', model: 'none', degraded: true, errors };
 }
 
+/** Un proveedor cuenta solo si tiene key CON FORMATO VÁLIDO (misma regla que la cadena). */
+function usableProvider(name) {
+  const p = config.ai.providers[name];
+  if (!p || !p.enabled) return false;
+  if (name === 'gemini') return /^AIza/.test(p.apiKey || '');
+  return true;
+}
+
 /** Estado de salud para el panel (qué proveedores están configurados/activos). */
 function health() {
   const P = config.ai.providers;
+  const names = ['gemini', 'groq', 'openrouter'];
+  const warnings = [];
+  if (P.gemini.enabled && !/^AIza/.test(P.gemini.apiKey || '')) {
+    warnings.push('GEMINI_API_KEY parece inválida (las claves de la API de Gemini empiezan con "AIza…"). Obtén una en https://aistudio.google.com/apikey');
+  }
   return {
-    configured: Object.entries(P).filter(([, v]) => v.enabled).map(([k, v]) => ({ provider: k, models: v.models })),
+    configured: names.filter(usableProvider).map((k) => ({ provider: k, models: P[k].models })),
     totalProviders: Object.keys(P).length,
-    live: Object.values(P).some((v) => v.enabled),
+    live: names.some(usableProvider),
+    warnings,
   };
 }
 

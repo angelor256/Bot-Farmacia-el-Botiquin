@@ -1,0 +1,53 @@
+{
+  "articles": [
+    {
+      "id": "kb-c9sytam",
+      "title": "Métodos de pago",
+      "content": "Aceptamos efectivo, tarjetas débito/crédito, transferencias y SINPE Móvil en ambas sucursales. Para facturas electrónicas indíquenos el correo.",
+      "keywords": [
+        "pago",
+        "pagar",
+        "sinpe",
+        "tarjeta",
+        "efectivo",
+        "transferencia",
+        "monedero"
+      ],
+      "category": "pagos",
+      "enabled": true
+    },
+    {
+      "id": "kb-pnaqzdt",
+      "title": "Servicio a domicilio",
+      "content": "Hacemos envíos a domicilio en Pavas y alrededores (₡1,000; gratis desde ₡10,000). Coordínelo con un farmacéutico.",
+      "keywords": [
+        "envio",
+        "envios",
+        "domicilio",
+        "delivery",
+        "entrega"
+      ],
+      "category": "envios",
+      "enabled": true
+    },
+    {
+      "id": "kb-egvc2s0",
+      "title": "Sucursales y horarios",
+      "content": "Pavas Centro (frente a la feria del farmer, L-20) y Lomas del Río (100 m sur de la entrada principal). Lun-Sáb 7:00-22:00, Dom 8:00-20:00. Tel 2213 5670.",
+      "keywords": [
+        "sucursal",
+        "sucursales",
+        "donde",
+        "ubicacion",
+        "horario",
+        "abren",
+        "cierran"
+      ],
+      "category": "general",
+      "enabled": true
+    }
+  ],
+  "policies": null,
+  "map": null,
+  "updatedAt": "2026-10-21T22:20:41.389Z"
+}

@@ -1,0 +1,77 @@
+{
+  "3001112233": {
+    "phone": "3001112233",
+    "name": null,
+    "botPaused": null,
+    "fsm": {
+      "state": 0,
+      "option": null,
+      "branch": null
+    },
+    "history": [
+      {
+        "role": "user",
+        "text": "hola",
+        "ts": 1792621062865,
+        "via": "client"
+      },
+      {
+        "role": "model",
+        "text": "¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle, digite el número de la opción:\n\n1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales",
+        "ts": 1792621062867,
+        "via": "bot"
+      }
+    ],
+    "updatedAt": 1792621062867
+  },
+  "3009998877": {
+    "phone": "3009998877",
+    "name": null,
+    "botPaused": null,
+    "fsm": {
+      "state": 3,
+      "option": "Compra de productos",
+      "branch": "Pavas Centro",
+      "misroutes": 0
+    },
+    "history": [
+      {
+        "role": "user",
+        "text": "5",
+        "ts": 1792621086195,
+        "via": "client"
+      },
+      {
+        "role": "model",
+        "text": "📍 *Nuestras sucursales*\n\n🏥 Pavas Centro - Frente a la feria del farmer, L-20\n🏥 Lomas del Rio - 100 m sur de la entrada principal\n\n🕐 Lun-Sab 7:00-22:00 · Dom 8:00-20:00\n\nDigite 1 o 2 para hacer un pedido en una de ellas. 💊",
+        "ts": 1792621086195,
+        "via": "bot"
+      },
+      {
+        "role": "user",
+        "text": "1",
+        "ts": 1792621086219,
+        "via": "client"
+      },
+      {
+        "role": "model",
+        "text": "¡Perfecto! 😊 Sera un gusto atenderle desde nuestra Sucursal Pavas Centro. 💙\n\nCuenteme, ¿en que le puedo ayudar?",
+        "ts": 1792621086219,
+        "via": "bot"
+      },
+      {
+        "role": "user",
+        "text": "¿a qué hora abren?",
+        "ts": 1792621086242,
+        "via": "client"
+      },
+      {
+        "role": "model",
+        "text": "🕐 Horarios El Botiquín:\nLun a Sáb: 7:00–22:00\nDom: 8:00–20:00 💙",
+        "ts": 1792621086334,
+        "via": "bot"
+      }
+    ],
+    "updatedAt": 1792621086334
+  }
+}
