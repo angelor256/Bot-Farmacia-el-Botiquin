@@ -20,8 +20,18 @@ const FILE = path.join(config.dataDir, 'chats.json');
 const MAX_MSG_CHARS = 1200;
 const users = new Map();
 
+
+/* Clave de usuario: número normalizado O id de sesión alfanumérico (simulador del panel). */
+function userKey(rawPhone) {
+  const n = phoneUtil.normalize(rawPhone);
+  if (n) return n;
+  const s = String(rawPhone ?? '').trim();
+  return /^[\w.\-]{2,32}$/.test(s) ? s : '';
+}
+
 function ensureShape(p) {
-  const key = phoneUtil.normalize(p);
+  const key = userKey(p);
+
   if (!key) throw new Error('store: teléfono vacío/no válido');
   if (!users.has(key)) {
     users.set(key, { phone: key, name: null, botPaused: null, fsm: { state: 0, option: null, branch: null }, history: [], updatedAt: null });
@@ -50,14 +60,14 @@ function appendMessage(rawPhone, role, text, meta = {}) {
  * @returns {{role:string, text:string}[]} ordenado de antiguo a nuevo.
  */
 function getRecentHistory(rawPhone, limit = config.ai.historyWindow) {
-  const u = users.get(phoneUtil.normalize(rawPhone));
+  const u = users.get(userKey(rawPhone));
   if (!u) return [];
   return u.history.slice(-Math.max(1, limit)).map(({ role, text }) => ({ role, text }));
 }
 
 /** Conversación completa para la vista del agente humano en el panel. */
 function getConversation(rawPhone) {
-  const u = users.get(phoneUtil.normalize(rawPhone));
+  const u = users.get(userKey(rawPhone));
   if (!u) return null;
   return { phone: u.phone, name: u.name, botPaused: !!u.botPaused, fsm: u.fsm, messages: u.history.slice() };
 }
@@ -100,7 +110,7 @@ function resumeBot(rawPhone) {
 
 /** ¿Debe contestar el bot? (check barato en el hot-path del webhook) */
 function isBotEnabled(rawPhone) {
-  const u = users.get(phoneUtil.normalize(rawPhone));
+  const u = users.get(userKey(rawPhone));
   return !(u && u.botPaused);
 }
 

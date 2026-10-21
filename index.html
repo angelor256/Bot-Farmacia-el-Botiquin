@@ -570,7 +570,6 @@ async function publishKnowledge(){
   }
 }
 $('btn-publish-kb').addEventListener('click', publishKnowledge);
-$('btn-test-publish').addEventListener('click', async () => { await publishKnowledge(); $('kb-test-input').value='¿Hacen inyecciones? ¿Tienen macrobiótica?'; $('kb-test').click(); });
 
 function renderMap(map){
   const TYPE_STYLE = { start:'bg-brand-600', flow:'bg-gray-700', ai:'bg-sky-600', escalation:'bg-amber-500', end:'bg-gray-500' };

@@ -13,7 +13,15 @@ const ai = require('./aiService');
 const wa = require('./whatsappService');
 const kb = require('./knowledgeService');
 const log = require('../utils/logger');
-const { mask } = require('../utils/phone');
+const { mask, normalize } = require('../utils/phone');
+
+/* IDs de sesión no telefónicos (simulador del panel: "sim-panel"): se conservan tal cual. */
+function resolveKey(raw) {
+  const n = normalize(raw);
+  if (n) return n;
+  const s = String(raw || '').trim();
+  return /^[\w.\-]{2,32}$/.test(s) ? s : '';
+}
 
 /* ---------- Textos del flujo ---------- */
 const MSG_HUMAN_TAKEOVER = 'Perfecto, le paso con un asesor humano 💙. En breve le atenderá una persona por este medio.';
@@ -130,7 +138,7 @@ async function handleAiStage(phone, msg) {
  * @returns {Promise<{handled:boolean, reason?:string, reply?:string}>}
  */
 function processIncoming({ from, text, name }) {
-  const phone = String(from || '').trim();
+  const phone = resolveKey(from); // números reales O ids de sesión del simulador ("sim-panel")
   if (!phone || !text) return Promise.resolve({ handled: false, reason: 'empty-payload' });
 
   // OBJETIVO #3: si un agente humano tomo este chat, el bot NO responde.
