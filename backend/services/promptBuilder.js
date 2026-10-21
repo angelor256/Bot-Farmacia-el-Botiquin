@@ -4,6 +4,8 @@
  * Separado del "cliente" de IA para poder auditar/testar el prompt sin red.
  */
 
+const { buildKnowledgePromptPart } = require('./knowledgeService');
+
 const MENU = `1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales`;
 
 const DEFAULT_RULES = {
@@ -15,10 +17,15 @@ const DEFAULT_RULES = {
 };
 
 /**
- * @param {{business_rules?:Object, branch?:string, option?:string, botName?:string}} ctx
+ * @param {{business_rules?:Object, branch?:string, option?:string, botName?:string,
+ *          message?:string, knowledge?:boolean}} ctx
+ *   - message: mensaje actual del cliente → se usan SUS datos para recuperar
+ *     artículos relevantes de la base de conocimiento (RAG ligero).
+ *   - knowledge:false desactiva la inyección (tests/depuración).
  */
 function buildSystemPrompt(ctx = {}) {
   const t = { ...DEFAULT_RULES, ...(ctx.business_rules || {}) };
+  const kbPart = ctx.knowledge === false ? '' : '\n' + buildKnowledgePromptPart({ message: ctx.message || '' });
   return `Eres "${ctx.botName || 'Dr. Boti'}", asistente virtual de ${ctx.pharmacy || 'Farmacia El Botiquín'}, una farmacia comunitaria en Lomas del Río, Pavas, San José, Costa Rica. Teléfono: 2213 5670.
 Servicios: medicamentos con y sin receta, cuidado personal, higiene, salud infantil, inyecciones en el local, y control de presión y glucosa.
 
@@ -44,7 +51,7 @@ REGLAS DEL DUEÑO (obedécelas siempre)
 
 CONTEXTO DEL CLIENTE: sucursal ${ctx.branch || 'sin definir'}; motivo: ${ctx.option || 'sin definir'}.
 Menú de referencia: ${MENU.replace(/\n/g, ' | ')}
-Si preguntan algo ajeno a la farmacia, redirige amablemente.`;
+Si preguntan algo ajeno a la farmacia, redirige amablemente.${kbPart}`;
 }
 
 module.exports = { buildSystemPrompt, MENU, DEFAULT_RULES };
