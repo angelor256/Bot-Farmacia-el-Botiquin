@@ -275,7 +275,7 @@ const ChatFSM = (() => {
    *    use una key NUEVA y bórrela al terminar la prueba.
    * Para producción: poner proxyUrl (Cloudflare Worker) y dejar apiKey vacío. */
   const GEMINI_CONFIG = {
-    apiKey  : 'AQ.Ab8RN6Imc2yYrqPUIxQJ1uDvW24CDZi_87rMVT6DM8nDG26GMg',
+    apiKey  : 'AQ.Ab8RN6KZx-EwL4RMDSOBhgiUhOWx3Q6LtxVpXaKAETfrNLpGFw',
     proxyUrl: '',
     models  : [
       { id:'gemini-3.8-flash',       label:'Gemini 3.8 Flash' },       // principal
@@ -284,7 +284,7 @@ const ChatFSM = (() => {
     temperature: 0.4,
     maxOutputTokens: 800,
     timeoutMs: 20000,
-    isLive(){ return !!this.proxyUrl || (!!this.apiKey && this.apiKey !== 'PEGAR_API_KEY_AQUI'); },
+    isLive(){ return !!this.proxyUrl || (!!this.apiKey && this.apiKey !== 'AQ.Ab8RN6KZx-EwL4RMDSOBhgiUhOWx3Q6LtxVpXaKAETfrNLpGFw'); },
   };
 
   const MENU = `1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales`;
