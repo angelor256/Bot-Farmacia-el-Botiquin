@@ -15,9 +15,16 @@ axios.post = async (url) => {
   if (r.status >= 400) { const e = new Error('http'); e.response = { status: r.status, data: r.body }; throw e; }
   return { data: r.body };
 };
-const ai = require('../services/aiService');
+let ai = require('../services/aiService');
 const geminiModel = (u) => u.split('/models/')[1].split(':')[0];
 const run = () => ai.generateReply({ userMessage: 'hola', history: [], context: {} });
+
+/** El gateway abre su circuit-breaker al detectar credenciales rotas; para que
+ *  cada prueba parta limpia, recargamos el módulo y reasignamos la referencia. */
+function freshGateway() {
+  delete require.cache[require.resolve('../services/aiService')];
+  ai = require('../services/aiService');
+}
 
 (async () => {
   // 1) Gemini modelo A -> 404 (modelo retirado): descarta A sin reintentos y prueba B.
@@ -33,19 +40,34 @@ const run = () => ai.generateReply({ userMessage: 'hola', history: [], context: 
   assert.strictEqual(calls.length, 2);
   console.log('OK  404 en modelo retirado -> pasa al siguiente:', calls.map(geminiModel).join(' -> '));
 
-  // 2) Key invalida (401) en Gemini -> no reintenta NADA en Gemini, cae a Groq.
+  // 2) Key invalida (Gemini la devuelve como HTTP 400 + reason API_KEY_INVALID,
+  //    Groq/OpenRouter como 401) -> NO reintenta ningún modelo más de ese
+  //    proveedor y cae directo a Groq.
+  freshGateway(); // breaker reseteado
   calls = []; scenario = [
-    { status: 401, body: { error: { message: 'API key not valid' } } },
+    { status: 400, body: { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID' }] } } },
     { status: 200, body: { choices: [{ message: { content: 'Respuesta desde Groq' } }] } },
   ];
   out = await run();
   assert.strictEqual(out.provider, 'groq');
   assert.strictEqual(out.text, 'Respuesta desde Groq');
-  assert.strictEqual(calls.filter((u) => u.includes('googleapis')).length, 1, 'auth = 1 sola llamada a Gemini');
+  assert.strictEqual(calls.filter((u) => u.includes('googleapis')).length, 1, 'auth(400 API_KEY_INVALID) = 1 sola llamada a Gemini');
   assert.strictEqual(calls.length, 2);
-  console.log('OK  401 en Gemini -> sin reintentos inutiles, cae a Groq (' + calls.length + ' llamadas)');
+  console.log('OK  key inválida (400/API_KEY_INVALID) -> sin reintentos inútiles, cae a Groq (' + calls.length + ' llamadas)');
+
+  // 2b) Regresión: Gemini con HTTP 401 clásico también debe saltar inmediato.
+  freshGateway();
+  calls = []; scenario = [
+    { status: 401, body: { error: { message: 'Unauthorized' } } },
+    { status: 200, body: { choices: [{ message: { content: 'Groq salvó la conversación' } }] } },
+  ];
+  out = await run();
+  assert.strictEqual(out.provider, 'groq');
+  assert.strictEqual(calls.filter((u) => u.includes('googleapis')).length, 1);
+  console.log('OK  401 clásico ->also salto inmediato a Groq');
 
   // 3) Saturo todos los destinos -> el cliente SIEMPRE recibe un texto de respaldo.
+  freshGateway();
   calls = []; scenario = Array.from({ length: 60 }, () => ({ status: 503, body: { error: { message: 'overloaded' } } }));
   out = await run();
   assert.strictEqual(out.provider, 'fallback-local');

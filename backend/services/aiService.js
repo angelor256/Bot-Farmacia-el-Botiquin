@@ -14,7 +14,9 @@
  *  5. Sin fallback real de proveedor → si Gemini caía, el bot callaba. Ahora:
  *     Gemini (N modelos) → Groq → OpenRouter → respuesta de respaldo local (fallback).
  */
-const axios = require('axios');
+// Se usa el módulo axios RESUELTO en tiempo de llamada (no capturado al require),
+// para que los tests puedan simular la red sustituyendo axios.post.
+const http = () => require('axios');
 const config = require('../config');
 const log = require('../utils/logger');
 const { buildSystemPrompt } = require('./promptBuilder');
@@ -35,7 +37,16 @@ class AiError extends Error {
 /** Clasifica un fallo de proveedor en una categoría accionable. */
 function classify(status, bodyText = '') {
   const b = String(bodyText).toLowerCase();
+  // OJO: Gemini NO devuelve 401 con key inválida: devuelve HTTP 400 con
+  // reason "API_KEY_INVALID" / "API key not valid". Sin este chequeo, ese
+  // error se clasificaba como desconocido y se reintentaban los 3 modelos
+  // con la misma key rota → el bot caía al fallback sin diagnóstico claro.
   if (status === 401 || status === 403) return 'auth';
+  if (b.includes('api_key_invalid') || b.includes('api key not valid') ||
+      b.includes('invalid api key') || b.includes('permission denied') ||
+      b.includes('unauthorized') || b.includes('key not valid') ||
+      b.includes('invalid x-api-key') || b.includes('insufficient credit') ||
+      b.includes('no endpoints found')) return 'auth';
   if (status === 404 || b.includes('not found') || b.includes('is not found for api version')) return 'notfound';
   if (status === 429 || b.includes('quota') || b.includes('rate')) return 'quota';
   if (status === 400 && (b.includes('safety') || b.includes('block') || b.includes('recitation'))) return 'blocked';
@@ -71,7 +82,7 @@ function toOpenAiMessages(systemPrompt, history, userMsg) {
 async function callGemini({ apiKey, baseUrl }, model, systemPrompt, contents) {
   const url = `${baseUrl}/${model}:generateContent`;
   try {
-    const { data } = await axios.post(url, {
+    const { data } = await http().post(url, {
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents,
       generationConfig: { temperature: config.ai.temperature, maxOutputTokens: config.ai.maxOutputTokens },
@@ -94,7 +105,7 @@ async function callGemini({ apiKey, baseUrl }, model, systemPrompt, contents) {
 
 async function callOpenAiCompatible({ apiKey, baseUrl }, model, messages) {
   try {
-    const { data } = await axios.post(`${baseUrl}/chat/completions`, {
+    const { data } = await http().post(`${baseUrl}/chat/completions`, {
       model, messages,
       temperature: config.ai.temperature,
       max_tokens: config.ai.maxOutputTokens,
@@ -131,6 +142,57 @@ const FALLBACKS = [
 ];
 const defaultFallback = () => FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
 
+/* ---------------- Circuit breaker (interruptor por proveedor) ---------------- */
+/**
+ * Si un proveedor falla por credenciales inválidas o agota toda su cadena de
+ * modelos, lo marcamos "abierto" durante un rato para no desperdiciar tiempo
+ * del cliente reintentando un destino roto en cada mensaje.
+ */
+const breaker = new Map(); // provider -> { until, reason }
+const BREAKER_MS = 60_000;
+function openBreaker(provider, reason) {
+  breaker.set(provider, { until: Date.now() + BREAKER_MS, reason });
+  log.warn(`[ai] circuit-breaker ABIERTO para ${provider} durante ${BREAKER_MS / 1000}s (${reason}).`);
+}
+const breakerOpen = (provider) => {
+  const b = breaker.get(provider);
+  if (!b) return false;
+  if (Date.now() >= b.until) { breaker.delete(provider); return false; }
+  return true;
+};
+
+/* ---------------- Diagnóstico local (sin keys) ---------------- */
+/**
+ * Cuando NO hay ninguna API key configurada, el gateway puede seguir
+ * respondiendo con reglas locales simples (menú, precios, horarios),
+ * útil para demos/simulador del panel. Devuelve null si no sabe responder
+ * (y entonces sí procede el fallback humano).
+ */
+function localAnswer(userMessage, context = {}) {
+  const t = String(userMessage || '').toLowerCase();
+  const rules = context.business_rules || {};
+  if (/horario|abren|cierran|atienden/.test(t)) {
+    return '🕐 Horarios El Botiquín:\nLun a Sáb: 7:00–22:00\nDom: 8:00–20:00 💙';
+  }
+  if (/direccion|donde|sucursal|ubicad/.test(t)) {
+    return '📍 Pavas Centro (frente a la feria del farmer, L-20) y Lomas del Río (100 m sur de la entrada principal). 🏥';
+  }
+  if (/env[ií]o|domicilio|delivery/.test(t)) {
+    return rules.envios_domicilio
+      ? 'Sí, hacemos envíos a domicilio 🛵. Indíquenos su dirección y producto y coordinamos la entrega. 💙'
+      : 'Por ahora no contamos con servicio a domicilio, pero le esperamos en cualquiera de nuestras sucursales. 🙏';
+  }
+  if (/precio|cuanto|vale|costo/.test(t)) {
+    const list = (context.price_lists || [])[0];
+    if (list && Array.isArray(list.items) && list.items.length) {
+      const hit = list.items.find((i) => t.includes(String(i.name || '').toLowerCase()));
+      if (hit) return `El/La ${hit.name} está en ₡${hit.price}. ¿Desea apartarlo? 💊`;
+    }
+    return 'Para precios exactos dígame el nombre del producto y la sucursal (Pavas Centro o Lomas del Río) y lo verifico con gusto. 😊';
+  }
+  return null;
+}
+
 /* ---------------- Cadena principal ---------------- */
 /**
  * Pide una respuesta a la IA recorriendo proveedores/modelos con reintento.
@@ -155,11 +217,19 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
   if (P.openrouter.enabled) P.openrouter.models.forEach((m) => plan.push({ run: () => callOpenAiCompatible(P.openrouter, m, messages), provider: 'openrouter', model: m }));
 
   if (!plan.length) {
+    // Sin ninguna API key: intentamos resolver localmente (horarios, sedes,
+    // envíos, precios) para que el bot NO muera en demos/simulador del panel.
+    const local = localAnswer(userMessage, context);
+    if (local) {
+      log.warn('[ai] Sin proveedores configurados: respuesta resuelta por reglas locales.');
+      return { text: local, provider: 'fallback-local', model: 'rules', degraded: true };
+    }
     log.warn('[ai] Ningún proveedor configurado (sin API keys): usando respuesta de respaldo.');
     return { text: defaultFallback(), provider: 'fallback-local', model: 'none', degraded: true };
   }
 
   for (const step of plan) {
+    if (breakerOpen(step.provider)) continue; // proveedor ya marcado como roto: lo saltamos
     for (let attempt = 0; attempt < config.ai.retry.attempts; attempt++) {
       try {
         const text = await step.run();
@@ -175,6 +245,9 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
         // la credencial es inválida o ese modelo concreto no existe en la API.
         if (err.kind === 'auth' || err.kind === 'notfound') {
           log.warn(`[ai] ${step.provider}/${step.model}: ${err.kind} → descarto este destino sin reintentos.`);
+          // auth = credencial rota para TODO el proveedor → abrimos el breaker
+          // y pasamos directo al siguiente proveedor de la cadena.
+          if (err.kind === 'auth') { openBreaker(step.provider, 'credencial inválida'); break; }
           break;
         }
         if (err.retryable && attempt < config.ai.retry.attempts - 1) { await sleep(backoff(attempt)); continue; }
@@ -182,6 +255,11 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
       }
     }
   }
+  // El breaker SOLO se abre por fallo de CREDENCIAL (kind auth), confirmado
+  // arriba en el catch. Un 404 es un problema por MODELO (el siguiente del
+  // mismo proveedor puede funcionar), y los fallos transitorios (5xx/quota)
+  // deben reintentarse en el próximo mensaje: abrir el breaker aquí sería
+  // un falso positivo que dejaría al bot sin su mejor proveedor.
 
   log.error(`[ai] TODOS los proveedores fallaron (${errors.length}). Sirviendo fallback.`);
   if (typeof onDegrade === 'function') onDegrade({ provider: 'fallback-local', model: 'none', attempts: attempted, errors });
@@ -198,4 +276,4 @@ function health() {
   };
 }
 
-module.exports = { generateReply, health, defaultFallback, toGeminiContents, toOpenAiMessages, AiError, classify };
+module.exports = { generateReply, health, defaultFallback, localAnswer, toGeminiContents, toOpenAiMessages, AiError, classify };
