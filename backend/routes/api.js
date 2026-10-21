@@ -82,7 +82,10 @@ router.post('/conversations/:phone/reply', requireAdmin, async (req, res) => {
 
 /* Simulador del panel: mismo flujo que el webhook, pero local y con respuesta. */
 router.post('/chat/simulate', chatLimiter, requireAdmin, async (req, res) => {
-  const from = normalize(req.body?.phone || 'sim-local');
+  // ⚠️ NO usar normalize() aquí: borra las letras y convertiría "sim-panel" en ""
+  // (bug que vaciaba el estado del simulador en cada mensaje). botController
+  // resuelve la clave internamente: números reales O ids de sesión alfanuméricos.
+  const from = String(req.body?.phone || 'sim-local').trim();
   const text = String(req.body?.message || '').trim();
   if (!text) return res.status(400).json({ error: 'El mensaje esta vacio' });
   const result = await bot.processIncoming({ from, text });
