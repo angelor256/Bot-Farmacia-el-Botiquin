@@ -1,0 +1,20 @@
+{
+  "name": "botiquin-backend",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Panel CRM + bot WhatsApp de Farmacia El Botiquín (Express + AI Gateway con fallback)",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0"
+  }
+}
