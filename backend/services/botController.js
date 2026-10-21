@@ -94,10 +94,23 @@ function handleBranchChoice(phone, msg) {
 /** Estado 3: llama a la IA con historial del usuario y fallback garantizado. */
 async function handleAiStage(phone, msg) {
   const u = store.ensureShape(phone);
+  // Bug "no responde correctamente" (ramo de menú): si el cliente escribe texto
+  // libre en estado 2, antes se re-pregaba por la sucursal INDEFINIDAMENTE y el
+  // chat quedaba atrapado ahí (nunca llegaba a la IA). A las 2 insistencias sin
+  // un 1/2 válido, asumimos que ya no está pidiendo producto y avanzamos al
+  // estado de IA usando la última sucursal conocida (o la principal).
+  if ((u.fsm.misroutes || 0) >= 2) {
+    store.setFsmState(phone, { state: 3, branch: u.fsm.branch || BRANCH_NAMES[1] });
+    log.info('[bot] ' + mask(phone) + ': 2 intentos sin opción válida -> se cede a la IA en modo libre.');
+    // No hay return: continuamos y esta misma respuesta la atiende la IA/RAG.
+  }
   const history = store.getRecentHistory(phone); // OBJETIVO #2: contexto filtrado por numero
   const context = { ...businessConfig, branch: u.fsm.branch, option: u.fsm.option };
   const result = await ai.generateReply({ userMessage: msg, history, context });
   log.info('[ai] ' + mask(phone) + ' -> ' + result.provider + '/' + result.model + (result.degraded ? ' (degradado)' : ''));
+  // El destino libre ya no es un laberinto: si la IA respondió, reseteamos el
+  // contador para que una futura mala lectura no escale de forma encadenada.
+  store.setFsmState(phone, { misroutes: 0 });
   // Protocolo de traspaso estilo Fin: la IA añade un token INVISIBLE cuando una
   // política exige escalar; lo retiramos del texto y pausamos el bot para ESTE usuario.
   if (/\[\[ESCALAR_HUMANO\]\]/.test(result.text)) {
@@ -106,6 +119,9 @@ async function handleAiStage(phone, msg) {
     log.info('[bot] IA solicito escalado segun politica -> bot pausado para ' + mask(phone));
     return result.text.replace(/\s*\[\[ESCALAR_HUMANO\]\]\s*/g, '').trim();
   }
+  // Si la IA remota estaba caída y ni siquiera las reglas locales cubrieron la
+  // pregunta, avisamos honestamente y ofrecemos la opción humana en vez de
+  // dejar al cliente dando vueltas sobre un menú que no pidió.
   return result.text;
 }
 

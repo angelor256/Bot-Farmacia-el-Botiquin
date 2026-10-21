@@ -47,7 +47,12 @@ function classify(status, bodyText = '') {
       b.includes('invalid api key') || b.includes('permission denied') ||
       b.includes('unauthorized') || b.includes('key not valid') ||
       b.includes('invalid x-api-key') || b.includes('insufficient credit') ||
-      b.includes('no endpoints found')) return 'auth';
+      b.includes('no endpoints found') ||
+      // Gemini responde ACCESS_TOKEN_TYPE_UNSUPPORTED cuando la credential NO
+      // es una API key clásica (AIzaSy...): son tokens de Google AI Studio /
+      // Firebase App Manager (formato "AQ....") que solo sirven en sus proxies
+      // propios y jamás funcionarán contra generativelanguage.googleapis.com.
+      b.includes('access_token_type_unsupported')) return 'auth';
   if (status === 404 || b.includes('not found') || b.includes('is not found for api version')) return 'notfound';
   if (status === 429 || b.includes('quota') || b.includes('rate')) return 'quota';
   if (status === 400 && (b.includes('safety') || b.includes('block') || b.includes('recitation'))) return 'blocked';
@@ -293,6 +298,16 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
   // un falso positivo que dejaría al bot sin su mejor proveedor.
 
   log.error(`[ai] TODOS los proveedores fallaron (${errors.length}). Sirviendo fallback.`);
+  // Última oportunidad ANTES del mensaje genérico de error: si la base de
+  // conocimiento enseñada en el panel (Sección D) o las reglas locales cubren
+  // la pregunta, el cliente recibe una respuesta útil aunque la IA remota
+  // esté caída/ mal configurada. Corrige el síntoma "no responde correctamente"
+  // cuando el único proveedor configurado tiene credenciales inválidas.
+  const local = localAnswer(userMessage, context);
+  if (local) {
+    if (typeof onDegrade === 'function') onDegrade({ provider: 'fallback-local', model: 'rules', attempts: attempted, errors });
+    return { text: local, provider: 'fallback-local', model: 'rules', degraded: true, errors };
+  }
   if (typeof onDegrade === 'function') onDegrade({ provider: 'fallback-local', model: 'none', attempts: attempted, errors });
   return { text: defaultFallback(), provider: 'fallback-local', model: 'none', degraded: true, errors };
 }
