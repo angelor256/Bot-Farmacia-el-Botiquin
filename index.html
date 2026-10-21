@@ -580,7 +580,7 @@ function renderMap(map){
         <span class="w-2.5 h-2.5 rounded-full ${TYPE_STYLE[s.type]||'bg-gray-400'}"></span>
         <span class="text-sm font-bold text-gray-800">${esc(s.label)}</span>
         ${s.id===map.entry?'<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 rounded ml-auto">INICIO</span>':''}
-        ${s.type==='escalation'?'<span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 rounded '+(s.id===map.entry?'':'ml-auto')">🙋 HUMANO</span>':''}
+        ${s.type==='escalation'?`<span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 rounded ${s.id===map.entry?'':'ml-auto'}">🙋 HUMANO</span>`:''}
       </div>
       ${s.actions?.length?`<p class="text-[11px] text-gray-500 mt-1">${esc(s.actions.join(' · '))}</p>`:''}
       ${(s.transitions||[]).length ? `<ul class="mt-1.5 space-y-0.5">${s.transitions.map(t=>`<li class="text-[11px] text-gray-600"><i class="fa-solid fa-arrow-right-long text-brand-500 mr-1"></i><b>${esc(t.on)}</b> → ${esc((map.states.find(x=>x.id===t.to)||{label:t.to}).label)}${t.note?` <span class="text-gray-400">(${esc(t.note)})</span>`:''}</li>`).join('')}</ul>`:'<p class="text-[11px] text-gray-300 italic mt-1">estado final</p>'}
