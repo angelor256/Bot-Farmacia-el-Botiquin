@@ -9,6 +9,7 @@ const store = require('../services/store');
 const bot = require('../services/botController');
 const ai = require('../services/aiService');
 const wa = require('../services/whatsappService');
+const kb = require('../services/knowledgeService');
 const { normalize } = require('../utils/phone');
 const log = require('../utils/logger');
 
@@ -87,6 +88,48 @@ router.post('/chat/simulate', chatLimiter, requireAdmin, async (req, res) => {
   const result = await bot.processIncoming({ from, text });
   const conv = store.getConversation(from);
   res.json({ ...result, state: conv?.fsm?.state ?? null, history: store.getRecentHistory(from), conversation: conv });
+});
+
+/* ============================================================
+   SECCIÓN D · ENTRENA AL BOT — Base de conocimiento estilo Fin AI
+   ============================================================ */
+
+/* Ver qué sabe hoy el bot: artículos + políticas + mapa de interacción. */
+router.get('/knowledge', requireAdmin, (_req, res) => {
+  const k = kb.getKnowledge();
+  res.json({ ...k, counts: { articles: k.articles.length, policies: k.policies.length } });
+});
+
+/* Enseñar/actualizar por secciones: solo se reemplaza lo que llega en el body. */
+router.put('/knowledge', requireAdmin, (req, res) => {
+  try {
+    const saved = kb.setKnowledge(req.body || {});
+    log.info('[api] base de conocimiento publicada desde el panel');
+    res.json({ ok: true, knowledge: saved });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/* Prueba "lo que la IA vería": system prompt con RAG + política detectada. */
+router.post('/knowledge/test', requireAdmin, (req, res) => {
+  const message = String(req.body?.message || '').trim();
+  if (!message) return res.status(400).json({ error: 'Falta "message"' });
+  const { buildSystemPrompt } = require('../services/promptBuilder');
+  const prompt = buildSystemPrompt({ ...bot.getBusinessConfig(), message });
+  res.json({
+    retrieved: kb.retrieve(message, { topK: 3 }),
+    escalationTrigger: kb.detectEscalation(message, { policies: kb.getKnowledge().policies }),
+    promptPreview: prompt.slice(0, 2600),
+    promptChars: prompt.length,
+  });
+});
+
+/* Reiniciar el flujo de un usuario concreto (deja de estar pausado también). */
+router.post('/conversations/:phone/reset', requireAdmin, (req, res) => {
+  const phone = normalize(req.params.phone);
+  if (!phone) return res.status(400).json({ error: 'Numero de telefono invalido' });
+  res.json({ ok: store.resetUser(phone), phone });
 });
 
 module.exports = router;

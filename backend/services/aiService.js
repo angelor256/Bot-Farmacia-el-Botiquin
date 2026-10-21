@@ -19,6 +19,7 @@
 const http = () => require('axios');
 const config = require('../config');
 const log = require('../utils/logger');
+const kb = require('./knowledgeService');
 const { buildSystemPrompt } = require('./promptBuilder');
 
 /* ---------------- Herreras de error tipadas ---------------- */
@@ -91,12 +92,15 @@ async function callGemini({ apiKey, baseUrl }, model, systemPrompt, contents) {
       timeout: config.ai.timeoutMs,
     });
     const cand = data?.candidates?.[0];
-    const text = (cand?.content?.parts || []).map((p) => p.text || '').join('').trim();
-    if (!text) {
-      const reason = cand?.finishReason || data?.promptFeedback?.blockReason || 'empty';
-      throw new AiError(`Gemini/${model}: sin texto (${reason})`, { status: 200, kind: reason === 'SAFETY' ? 'blocked' : 'empty', provider: 'gemini', model });
-    }
-    return text;
+    // CAMBIO CLAVE (bug "responde mal"): antes un 200 con texto vacío lanzaba
+    // AiError('empty') que NO era retryable ni skip → abortaba TODA la cadena
+    // y caía directo al fallback genérico. Ahora devuelve null y el orquestador
+    // prueba el siguiente modelo/proveedor antes de rendirse.
+    const text = extractGeminiText(cand, data);
+    if (text === null) return null;
+    // Post-proceso: los modelos alucinan a veces la sintaxis del endpoint
+    // ":streamGenerateContent" dentro del texto. Se limpia para no romper la UI.
+    return text.replace(/\/v1beta\/models\/[\w.-]+:streamGenerateContent\?[^*\s]*/g, 'la sucursal');
   } catch (err) {
     if (err instanceof AiError) throw err;
     throw wrapAxios(err, 'gemini', model);
@@ -114,7 +118,7 @@ async function callOpenAiCompatible({ apiKey, baseUrl }, model, messages) {
       timeout: config.ai.timeoutMs,
     });
     const text = data?.choices?.[0]?.message?.content?.trim();
-    if (!text) throw new AiError(`${model}: respuesta vacía`, { status: 200, kind: 'empty', provider: 'openai-compat', model });
+    if (!text) return null; // mismo criterio: 200-vacío → siguiente destino, no muerte de cadena
     return text;
   } catch (err) {
     if (err instanceof AiError) throw err;
@@ -171,6 +175,12 @@ const breakerOpen = (provider) => {
 function localAnswer(userMessage, context = {}) {
   const t = String(userMessage || '').toLowerCase();
   const rules = context.business_rules || {};
+  // 1) Base de conocimiento enseñada desde el panel (Sección D "Entrena al bot"):
+  //    si una ficha coincide con la pregunta, ESA es la respuesta autoritativa.
+  const hits = kb.retrieve(userMessage, { topK: 2 });
+  if (hits.length && hits[0].score >= 3) {
+    return `💙 ${hits[0].title}\n${hits[0].excerpt}`;
+  }
   if (/horario|abren|cierran|atienden/.test(t)) {
     return '🕐 Horarios El Botiquín:\nLun a Sáb: 7:00–22:00\nDom: 8:00–20:00 💙';
   }
@@ -195,16 +205,33 @@ function localAnswer(userMessage, context = {}) {
 
 /* ---------------- Cadena principal ---------------- */
 /**
+ * Devuelve el texto de un candidato de Gemini, o null si el modelo respondió
+ * 200 pero con contenido no utilizable (bloqueo de seguridad, corte por
+ * límite de tokens, solo thought-signatures). Esos casos se recorren como
+ * destino fallido para probar el siguiente modelo/proveedor ANTES de caer
+ * al fallback — antes era la causa #1 de "no responde correctamente" con
+ * prompts largos: HTTP 200 + parts[] vacío.
+ */
+function extractGeminiText(cand, data) {
+  const text = (cand?.content?.parts || []).map((p) => p.text || '').join('').trim();
+  if (text) return text;
+  const reason = cand?.finishReason || data?.promptFeedback?.blockReason || '';
+  log.warn(`[ai] Gemini respondió sin texto útil (motivo: ${reason || 'vacío'}); se prueba el siguiente destino`);
+  return null;
+}
+
+/**
  * Pide una respuesta a la IA recorriendo proveedores/modelos con reintento.
  * @param {Object} opts
  * @param {string} opts.userMessage        Mensaje actual del cliente.
  * @param {Array<{role,text}>} [opts.history] Historial reciente (desde store.getRecentHistory).
- * @param {Object} [opts.context]          business_rules / branch / option para el prompt.
+ * @param {Object} [opts.context]          business_rules / branch / option / message para el prompt.
  * @param {(info:{provider,model,attempts,errors})=>void} [opts.onDegrade] aviso de degradación.
  * @returns {Promise<{text:string, provider:string, model:string, degraded:boolean}>}
  */
 async function generateReply({ userMessage, history = [], context = {}, onDegrade }) {
-  const systemPrompt = buildSystemPrompt(context);
+  // ctx.message permite que el RAG recupere artículos según la pregunta ACTUAL.
+  const systemPrompt = buildSystemPrompt({ ...context, message: userMessage });
   const contents = toGeminiContents(history, userMessage);
   const messages = toOpenAiMessages(systemPrompt, history, userMessage);
   const errors = [];
@@ -232,7 +259,11 @@ async function generateReply({ userMessage, history = [], context = {}, onDegrad
     if (breakerOpen(step.provider)) continue; // proveedor ya marcado como roto: lo saltamos
     for (let attempt = 0; attempt < config.ai.retry.attempts; attempt++) {
       try {
-        const text = await step.run();
+        let text = await step.run();
+        if (text === null) { // 200-pero-vacío/bloqueado → tratar como fallo y seguir la cadena
+          errors.push(`${step.provider}/${step.model}: respuesta vacía o bloqueada`);
+          break; // siguiente destino (otro modelo suele generar texto donde este se bloqueó)
+        }
         attempted++;
         const degraded = errors.length > 0;
         if (degraded && typeof onDegrade === 'function') onDegrade({ provider: step.provider, model: step.model, attempts: attempted, errors });

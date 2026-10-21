@@ -103,6 +103,66 @@
         </div>
       </article>
 
+      <article class="bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-brand-50/70 to-white flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-gray-900 flex items-center gap-2"><i class="fa-solid fa-brain text-brand-600"></i> Sección D · Entrena al Bot <span class="text-[10px] align-middle bg-violet-100 text-violet-700 font-bold px-2 py-0.5 rounded-full ml-1">estilo Fin AI</span></h2>
+            <p class="text-sm text-gray-500 mt-1">Enséñale hechos sobre tu empresa, define reglas obligatorias y dibuja el mapa de interacción: <strong>cuándo responde el bot y cuándo escala a un humano</strong>.</p>
+          </div>
+          <button id="btn-publish-kb" type="button" class="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs text-white bg-gradient-to-r from-violet-600 to-brand-600 hover:opacity-90 shadow-soft transition disabled:opacity-60"><i class="fa-solid fa-graduation-cap"></i> Publicar entrenamiento</button>
+        </div>
+
+        <div class="p-6 space-y-8">
+          <!-- D.1 Artículos -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500"><i class="fa-solid fa-book-open text-brand-600 mr-1"></i> Base de conocimiento — enséñale hechos</h3>
+              <span id="kb-count" class="text-[11px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">0</span>
+            </div>
+            <p id="kb-note" class="hidden text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-3">Usando la configuración base de El Botiquín. Crea tus propios artículos y pulsa <b>Publicar entrenamiento</b>.</p>
+            <ul id="kb-articles" class="space-y-2"></ul>
+            <p id="kb-empty" class="text-sm text-gray-400 italic py-3">Aún no hay artículos enseñados.</p>
+            <button id="kb-add-toggle" type="button" class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800"><i class="fa-solid fa-plus"></i> Añadir artículo</button>
+            <div id="kb-form" class="hidden mt-3 p-4 rounded-xl border border-brand-200 bg-brand-50/40 space-y-3">
+              <input id="kb-title" placeholder="Título (ej: Inyecciones en sucursal)" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-brand-500 outline-none"/>
+              <textarea id="kb-content" rows="3" placeholder="Contenido: lo que el bot debe saber y decir. Sé concreto: qué, dónde, cuánto, requisitos." class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-brand-500 outline-none"></textarea>
+              <div class="flex flex-wrap gap-3">
+                <input id="kb-keywords" placeholder="palabras clave separadas por coma (ej: inyeccion, inmunizacion)" class="flex-1 min-w-[180px] text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500"/>
+                <select id="kb-category" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none">
+                  <option value="general">general</option><option value="servicios">servicios</option><option value="productos">productos</option><option value="pagos">pagos</option><option value="envios">envíos</option>
+                </select>
+                <button id="kb-save-article" type="button" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-bold hover:bg-brand-700">Guardar ficha</button>
+                <button id="kb-cancel" type="button" class="px-3 py-2 rounded-lg text-gray-500 text-sm hover:text-gray-700">Cancelar</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- D.2 Reglas / políticas -->
+          <section>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3"><i class="fa-solid fa-scale-balanced text-brand-600 mr-1"></i> Reglas del bot — obligatorias para la IA</h3>
+            <div id="kb-policies" class="space-y-2"></div>
+            <button id="kb-add-policy" type="button" class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800"><i class="fa-solid fa-plus"></i> Añadir regla</button>
+            <p class="text-[11px] text-gray-400 mt-2"><i class="fa-solid fa-circle-info"></i> Reglas marcadas como <b>escala a humano</b> activan el traspaso automático: el bot se pausa para ese cliente y el mensaje queda en la bandeja del agente.</p>
+          </section>
+
+          <!-- D.3 Mapa de interacción -->
+          <section>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3"><i class="fa-solid fa-diagram-project text-brand-600 mr-1"></i> Mapa de interacción — cuándo sí / cuándo no escalar</h3>
+            <div id="kb-map" class="max-w-md mx-auto space-y-0"></div>
+          </section>
+
+          <!-- D.4 Probador -->
+          <section class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2"><i class="fa-solid fa-flask text-brand-600 mr-1"></i> Probar una pregunta</h3>
+            <div class="flex gap-2">
+              <input id="kb-test-input" placeholder="Ej: ¿Puedo hablar con un humano?" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:border-brand-500"/>
+              <button id="kb-test" type="button" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold hover:bg-black">Probar</button>
+            </div>
+            <div id="kb-test-result" class="hidden mt-3 text-sm"></div>
+          </section>
+        </div>
+      </article>
+
       <article class="bg-white rounded-xl shadow-card border border-gray-100 p-6">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
           <div class="flex items-start gap-3">
@@ -161,13 +221,46 @@
 <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-24 opacity-0 pointer-events-none" role="status">
   <div class="flex items-center gap-3 bg-white border border-brand-200 shadow-card rounded-xl px-4 py-3 max-w-sm">
     <div class="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-circle-check"></i></div>
-    <div><p class="text-sm font-bold text-gray-900">¡Configuración guardada!</p><p class="text-xs text-gray-500">El bot ya responde con tus nuevas reglas.</p></div>
+    <div><p class="text-sm font-bold text-gray-900">Panel · El Botiquín</p><p id="toast-message" class="text-xs text-gray-500">Listo.</p></div>
     <button id="toast-close" class="ml-2 text-gray-400 hover:text-gray-600" aria-label="Cerrar notificación"><i class="fa-solid fa-xmark"></i></button>
   </div>
 </div>
 
 <script>
 'use strict';
+
+/* ===== 0. CONEXIÓN CON EL BACKEND ===== */
+const API_BASE = (location.protocol === 'file:' || location.hostname === '')
+  ? 'http://localhost:3000' : '';           // abierto desde el propio backend → mismo origen
+const ADMIN_TOKEN = (() => {                // solo para desarrollo; en producción se gestiona por sesión
+  const p = new URLSearchParams(location.search).get('token');
+  if (p) return p;
+  const saved = localStorage.getItem('bot_admin_token') || '';
+  if (location.hostname && location.hostname !== 'localhost') return saved; // desplegado: NO usar default
+  return saved || 'cambia-este-token';       // localhost: conveniencia para pruebas
+})();
+localStorage.setItem('bot_admin_token', ADMIN_TOKEN);
+
+async function api(pathname, opts = {}) {
+  const res = await fetch(API_BASE + '/api' + pathname, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN, ...(opts.headers || {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+/* Estado vivo del backend (IA configurada / modo demo) */
+(async () => {
+  try {
+    const h = await api('/health');
+    $('ai-status-text').textContent = h.ai?.live ? `IA conectada (${h.ai.configured.map(c => c.provider).join(' → ')})` : 'Modo demo · reglas locales';
+    $('ai-status').className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ' +
+      (h.ai?.live ? 'bg-emerald-50 text-brand-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+  } catch { $('ai-status-text').textContent = 'Backend no disponible'; }
+})();
 
 /* ===== 1. TOGGLES ===== */
 const TOGGLE_DEFS = [
@@ -240,7 +333,7 @@ fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInpu
 ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
 dropzone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
 
-/* ===== 3. GUARDAR ===== */
+/* ===== 3. GUARDAR (ahora SÍ persiste en el backend) ===== */
 const collectConfigPayload = () => ({
   bot_name: 'Dr. Boti', pharmacy: 'Farmacia El Botiquín',
   business_rules: { ...uiState.toggles },
@@ -252,58 +345,37 @@ $('btn-save').addEventListener('click', async () => {
   btn.disabled = true;
   $('btn-save-icon').className = 'fa-solid fa-circle-notch fa-spin';
   $('btn-save-label').textContent = 'Guardando...';
-  console.log('[PAYLOAD → BACKEND]', collectConfigPayload());   // aquí iría el fetch POST al backend
-  await new Promise(r => setTimeout(r, 1200));
-  btn.disabled = false;
-  $('btn-save-icon').className = 'fa-solid fa-check-double';
-  $('btn-save-label').textContent = 'Guardar Configuración';
-  showToast();
+  try {
+    await api('/config', { method: 'POST', body: collectConfigPayload() });
+    showToast('✅ Configuración publicada: el bot ya la está usando.');
+  } catch (err) {
+    console.error('[config]', err);
+    showToast('⚠️ No se pudo guardar en el backend: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    $('btn-save-icon').className = 'fa-solid fa-check-double';
+    $('btn-save-label').textContent = 'Guardar Configuración';
+  }
 });
-const toast = $('toast'); let toastTimer = null;
-function showToast(){ clearTimeout(toastTimer); toast.classList.remove('translate-y-24','opacity-0','pointer-events-none'); toastTimer = setTimeout(hideToast, 4200); }
+const toast = $('toast'); let toastTimer = null; let toastMsg = $('toast-message');
+function showToast(msg){ if (msg && toastMsg) toastMsg.textContent = msg; clearTimeout(toastTimer); toast.classList.remove('translate-y-24','opacity-0','pointer-events-none'); toastTimer = setTimeout(hideToast, 4200); }
 function hideToast(){ toast.classList.add('translate-y-24','opacity-0','pointer-events-none'); }
 $('toast-close').addEventListener('click', hideToast);
 setInterval(() => { const d = new Date(); $('clock').textContent = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }, 1000);
 
-/* ===== 4. CHAT (FSM + GEMINI) ===== */
+/* ===== 4. CHAT (conectado al backend: mismo flujo que el webhook real) ===== */
 const ChatFSM = (() => {
-
-  /* ---------- CONFIGURACIÓN DE GEMINI ----------
-   * Dos modelos con LA MISMA API key: si el primero falla (cuota, modelo
-   * retirado, sobrecarga), el bot prueba automáticamente con el segundo.
-   * ⚠️ Una key en el HTML es visible para cualquiera. Solo para pruebas:
-   *    use una key NUEVA y bórrela al terminar la prueba.
-   * Para producción: poner proxyUrl (Cloudflare Worker) y dejar apiKey vacío. */
-  const GEMINI_CONFIG = {
-    apiKey  : 'AQ.Ab8RN6Imc2yYrqPUIxQJ1uDvW24CDZi_87rMVT6DM8nDG26GMg',
-    proxyUrl: '',
-    models  : [
-      { id:'gemini-3.8-flash',       label:'Gemini 3.8 Flash' },       // principal
-      { id:'gemini-3.5-flash-lite',  label:'Gemini 3.5 Flash-Lite' },  // respaldo
-    ],
-    temperature: 0.4,
-    maxOutputTokens: 800,
-    timeoutMs: 20000,
-    isLive(){ return !!this.proxyUrl || (!!this.apiKey && this.apiKey !== 'PEGAR_API_KEY_AQUI'); },
-  };
-
   const MENU = `1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales`;
   const MSG_WELCOME = `😊 Soy Dr. Boti, asistente virtual de Farmacia El Botiquín. 💙🧡\n\nPara ayudarle con lo que necesita, por favor digite el número de la opción correspondiente:\n\n${MENU}\n\nSerá un gusto ayudarle.`;
-  const MSG_BRANCHES = `¡Con mucho gusto! 😊💙\n\n¿En cuál de nuestras sucursales desea realizar su pedido?\n\n1️⃣ Pavas Centro\n2️⃣ Lomas del Río\n\nPor favor, digite 1 o 2 para continuar con su pedido. 💊`;
-  const BRANCH_NAMES = { '1':'Pavas Centro', '2':'Lomas del Río' };
-  const ERROR_MSG = 'Ups, hubo un problema al conectar con mi cerebro IA 😅. Reintente en unos segundos o escriba a la farmacia directamente.';
-  const GREETING_RE = /^(hola|holi|buenas|buen[oa]s?\s*(d[ií]as|tardes|noches)|hey|hi|saludos?)\b/i;
-  const THANKS_RE   = /\b(gracias|muchas\s*gracias)\b/i;
+  const STATE_LABELS = ['0 · Inicio','1 · Esperando Opción','2 · Esperando Sucursal','3 · IA Activa ✨','4 · Humano 🙋'];
 
   const win = $('chat-window'), form = $('chat-form'), input = $('chat-input');
   const badge = $('state-badge'), presence = $('wa-presence'), modelBadge = $('model-badge');
 
-  let state = 0, selectedOption = null, selectedBranch = null, busy = false, sessionId = null;
-  let epoch = 0;              // invalida respuestas pendientes al reiniciar el chat
-  let history = [];           // memoria de la conversación con Gemini
+  let state = 0, busy = false, epoch = 0;
+  const simPhone = 'sim-panel'; // el simulador habla con el backend bajo este número
 
-  const STATE_LABELS = ['0 · Inicio','1 · Esperando Opción','2 · Esperando Sucursal','3 · IA Activa ✨'];
-  function setState(s){ state = s; badge.textContent = STATE_LABELS[s]; badge.className = s >= 3 ? 'text-amber-600' : 'text-brand-700'; }
+  function setState(s){ state = s; badge.textContent = STATE_LABELS[s] || s; badge.className = s >= 3 ? 'text-amber-600' : 'text-brand-700'; }
 
   const scrollDown = () => { win.scrollTop = win.scrollHeight; };
   const nowTime = () => { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); };
@@ -348,187 +420,183 @@ const ChatFSM = (() => {
     showTyping(delay, () => { if (myEpoch !== epoch) return; pushBubble(text, 'in'); busy = false; });
   }
 
-  /* ---------- Gemini ---------- */
-  function buildSystemPrompt(){
-    const t = uiState.toggles;
-    return `Eres "Dr. Boti", asistente virtual de Farmacia El Botiquín, una farmacia comunitaria en Lomas del Río, Pavas, San José, Costa Rica. Teléfono: 2213 5670.
-Servicios: medicamentos con y sin receta, cuidado personal, higiene, salud infantil, inyecciones en el local, y control de presión y glucosa.
-
-ESTILO
-- Español costarricense, cálido y profesional, tratando de "usted".
-- Máximo 5 líneas. Formato WhatsApp (*negritas* permitidas), emojis con moderación.
-- Responde directamente lo que el cliente pregunta. No repitas saludos ni frases de relleno en cada mensaje.
-- Si falta un dato clave (para quién es, síntomas, si tiene alergias), haz UNA sola pregunta.
-
-CÓMO RESPONDER SOBRE MEDICAMENTOS
-- Puedes explicar para qué sirve un medicamento, sus presentaciones comunes y precauciones generales.
-- NO des dosis personalizadas ni diagnósticos. Para dosis, embarazo, niños, adultos mayores o combinaciones, indica que lo confirme con el farmacéutico en la sucursal o por teléfono.
-- Si los síntomas parecen graves (dolor de pecho, dificultad para respirar, fiebre alta en bebés, etc.), recomienda atención médica de inmediato.
-- NO inventes precios ni existencias. Di que el farmacéutico confirma disponibilidad y precio.
-
-REGLAS DEL DUEÑO (obedécelas siempre)
-- Envíos a domicilio: ${t.envios_domicilio ? 'ACTIVADOS. Ofrécelos cuando convenga y pide la dirección.' : 'DESACTIVADOS. No los ofrezcas; ofrece recoger en sucursal.'}
-- Genéricos: ${t.ofrecer_genericos ? 'ACTIVADOS. Si el cliente busca un medicamento de marca, menciona que puede haber un genérico equivalente y que el farmacéutico lo confirma.' : 'DESACTIVADOS. No menciones genéricos.'}
-- Recetas por foto: ${t.recetas_medicas ? 'ACEPTADAS. Pide la foto si el medicamento la requiere.' : 'NO ACEPTADAS. Si necesita receta, pídale presentarla en la sucursal.'}
-- Macrobiótica y suplementos: ${t.macrobiotica ? 'DISPONIBLES.' : 'NO DISPONIBLES. Indica que por ahora no se atienden por este medio.'}
-- Fuera de horario: ${t.fuera_de_linea ? 'ACTIVO. Avisa que responderán al abrir.' : 'DESACTIVADO.'}
-
-CONTEXTO DEL CLIENTE: sucursal ${selectedBranch || 'sin definir'}; motivo: ${selectedOption || 'sin definir'}.
-Si preguntan algo ajeno a la farmacia, redirige amablemente.`;
-  }
-
-  /** Una llamada a UN modelo concreto. Lanza error con el detalle si falla. */
-  async function callModel(model, contents){
-    const body = JSON.stringify({
-      system_instruction: { parts: [{ text: buildSystemPrompt() }] },
-      contents,
-      generationConfig: { maxOutputTokens: GEMINI_CONFIG.maxOutputTokens, thinkingConfig: { thinkingLevel: 'low' } },
-    });
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), GEMINI_CONFIG.timeoutMs);
-    try {
-      const viaProxy = !!GEMINI_CONFIG.proxyUrl;
-      const res = await fetch(
-        viaProxy ? GEMINI_CONFIG.proxyUrl : `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`,
-        { method:'POST', signal: ctrl.signal,
-          headers: viaProxy ? { 'Content-Type':'application/json' } : { 'Content-Type':'application/json', 'x-goog-api-key': GEMINI_CONFIG.apiKey },
-          body: viaProxy ? JSON.stringify({ ...JSON.parse(body), model: model.id }) : body });
-      if (!res.ok) throw new Error(`${model.label} → HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
-      if (!text) throw new Error(`${model.label} → respuesta vacía (${data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason || 'sin motivo'})`);
-      return text;
-    } finally { clearTimeout(timer); }
-  }
-
-  /** Prueba el modelo principal y, si falla, el de respaldo (misma API key). */
-  async function askGemini(userMsg){
-    const contents = [...history, { role:'user', parts:[{ text:userMsg }] }].slice(-12);
-    const errors = [];
-    for (const model of GEMINI_CONFIG.models){
-      try {
-        const text = await callModel(model, contents);
-        history = [...contents, { role:'model', parts:[{ text }] }].slice(-12);
-        modelBadge.textContent = model.label;
-        modelBadge.className = errors.length ? 'text-amber-600' : 'text-brand-700';
-        return text;
-      } catch (err) {
-        console.error('[Gemini]', err);
-        errors.push(err.message);
-      }
-    }
-    modelBadge.textContent = 'sin respuesta'; modelBadge.className = 'text-red-600';
-    throw new Error(errors.join(' | '));
-  }
-
-  /* ---------- Estados 1 y 2 ---------- */
-  const isGreeting = m => GREETING_RE.test(m.trim());
-  const isThanks   = m => THANKS_RE.test(m.trim());
-
-  function handleOptionChoice(msg){
-    if (msg === '1' || msg === '2'){
-      selectedOption = msg === '1' ? 'Compra de productos' : 'Consulta Farmacéutica';
-      setState(2); botSay(MSG_BRANCHES);
-    } else if (isGreeting(msg)){
-      botSay(`¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle con lo que necesita, por favor digite el número de la opción correspondiente:\n\n${MENU}`);
-    } else if (isThanks(msg)){
-      botSay('¡Con mucho placer! Es un gusto servirle. Que tenga excelente día. 😊💙🧡');
-    } else if (msg === '3'){
-      selectedOption = 'Macrobiótica y Suplementos';
-      botSay(`¡Excelente elección! 🌿\n\nLa opción 3️⃣ «Macrobiótica y Suplementos» está ${uiState.toggles.macrobiotica ? 'disponible en nuestro catálogo' : 'temporalmente deshabilitada por el administrador'}.\n\n${uiState.toggles.macrobiotica ? 'Cuénteme, ¿qué suplemento o producto natural busca? 😊' : 'Puede elegir otra opción del menú. 💙'}`);
-    } else if (msg === '4'){
-      botSay('Muchas gracias por ayudarnos a mejorar 🙏\n\nEscriba su sugerencia y el equipo de El Botiquín la revisará personalmente. 💙');
-    } else if (msg === '5'){
-      botSay(`📍 *Nuestras sucursales*\n\n🏥 Pavas Centro — Frente a la feria del farmer, L-20\n🏥 Lomas del Río — 100 m sur de la entrada principal\n\n🕐 Lun–Sáb 7:00–22:00 · Dom 8:00–20:00\n\nDigite 1 o 2 para hacer un pedido en una de ellas. 💊`);
-      selectedOption = 'Compra de productos'; setState(2);
-    } else {
-      botSay(`Disculpe, no entendí 😅. Por favor digite el número de la opción correspondiente:\n\n${MENU}`);
-    }
-  }
-
-  function handleBranchChoice(msg){
-    if (msg === '1' || msg === '2'){
-      selectedBranch = BRANCH_NAMES[msg];
-      sessionId = 'wa-' + crypto.randomUUID();
-      history = [];
-      setState(3);
-      botSay(`¡Perfecto! 😊 Será un gusto atenderle desde nuestra Sucursal ${selectedBranch}. 💙\n\nCuénteme, ¿en qué le puedo ayudar?`);
-    } else {
-      botSay('Por favor digite 1️⃣ Pavas Centro o 2️⃣ Lomas del Río para continuar con su pedido. 💊');
-    }
-  }
-
-  /* ---------- Estado 3: IA ---------- */
-  function handleAIMessage(msg){
-    busy = true;
+  /* ---------- El unico cerebro esta en el backend (aiService + botController) ---------- */
+  async function sendToBackend(msg){
     const myEpoch = epoch;
-    showTyping(500, async () => {
-      let reply;
-      if (GEMINI_CONFIG.isLive()){
-        try { reply = await askGemini(msg); }
-        catch (err) { console.error('[Gemini] todos los modelos fallaron:', err.message); reply = ERROR_MSG; }
-      } else {
-        reply = simulateAIResponse(msg);   // modo demo sin API key
+    busy = true; presence.textContent = 'escribiendo…';
+    try {
+      const r = await api('/chat/simulate', { method: 'POST', body: { phone: simPhone, message: msg } });
+      if (myEpoch !== epoch) return;                    // chat reiniciado mientras respondia
+      setState(r.state ?? state);
+      const conv = r.conversation;
+      if (conv?.botPaused){ modelBadge.textContent = 'agente humano 🙋'; modelBadge.className = 'text-amber-600'; }
+      else if (r.reply){
+        pushBubble(r.reply, 'in');
+        const st = conv?.fsm?.state;
+        modelBadge.textContent = st >= 3 ? 'IA · via backend' : 'FSM · flujo local';
+        modelBadge.className = st >= 3 ? 'text-brand-700' : 'text-gray-700';
       }
-      if (myEpoch !== epoch) return;
-      pushBubble(reply, 'in');
-      busy = false;
-    });
-  }
-
-  /** Respuesta local de demostración (solo si no hay API key ni proxy) */
-  function simulateAIResponse(userMsg){
-    const t = uiState.toggles, lower = userMsg.toLowerCase();
-    const med  = /(medic|pastill|tableta|ibuprofeno|acetaminof|paracetamol|amoxi|aspirina|jarabe)/i.test(userMsg);
-    const deliv = /(env[ií]o|domicilio|delivery|entrega|env[ií]arme)/i.test(userMsg);
-    const nat  = /(vitamina|suplemento|macrobi|natural|colageno|colágeno|hierba|herbolar)/i.test(userMsg);
-    let r = `Gracias por su mensaje en Sucursal ${selectedBranch} (${selectedOption}). 💙`;
-    if (med){
-      r += '\n\nHe consultado nuestro catálogo 💊.';
-      r += t.ofrecer_genericos ? '\n✨ También puedo ofrecerle la versión GENÉRICA equivalente. ¿Le interesa?' : '\nLe comparto únicamente la marca comercial disponible.';
-      r += t.recetas_medicas ? '\n📷 Si requiere receta, envíeme una foto y la validamos.' : '\nℹ️ La carga de recetas está deshabilitada por el administrador.';
-    }
-    if (nat) r += t.macrobiotica ? '\n\n🌿 Nuestra línea macrobiótica incluye vitaminas, colágeno y suplementos naturales.' : '\n\nLa sección macrobiótica está temporalmente deshabilitada. 🌿';
-    if (deliv) r += t.envios_domicilio ? `\n\n🛵 ¡Sí hacemos envíos a domicilio! Envíeme su ubicación exacta para coordinar.` : `\n\n😔 Los envíos a domicilio están deshabilitados. Puede recoger su pedido en ${selectedBranch}.`;
-    if (t.fuera_de_linea) r += '\n\n🌙 Estamos fuera de horario: sus datos quedan registrados y le responderemos al abrir.';
-    if (!med && !deliv && !nat) r += '\n\nCuénteme con detalle: ¿qué producto o servicio necesita hoy?';
-    if (lower.includes('gracias')) r += '\n\n¡Con mucho placer! 😊💙🧡';
-    return r;
-  }
-
-  /* ---------- Entrada del usuario ---------- */
-  function route(msg){
-    switch (state){
-      case 0: case 1: return handleOptionChoice(msg);
-      case 2: return handleBranchChoice(msg);
-      case 3: return handleAIMessage(msg);
+    } catch (err) {
+      console.error('[simulate]', err);
+      if (myEpoch === epoch) pushBubble('⚠️ No logro conectar con el backend (' + err.message + '). Ejecuta: cd backend && npm run dev', 'in');
+    } finally {
+      if (myEpoch === epoch){ busy = false; presence.textContent = 'en linea'; }
     }
   }
+
+
+  /* ---------- Entrada del usuario: todo se enruta al backend ---------- */
   form.addEventListener('submit', e => {
     e.preventDefault();
     const msg = input.value.trim();
     if (!msg || busy) return;
     input.value = '';
     pushBubble(msg, 'out');
-    route(msg);
+    sendToBackend(msg);
   });
 
   function boot(){
     epoch++;
     win.innerHTML = '';
-    selectedOption = selectedBranch = sessionId = null;
-    history = []; busy = false; presence.textContent = 'en línea';
+    busy = false; presence.textContent = 'en línea';
     modelBadge.textContent = 'sin usar'; modelBadge.className = 'text-gray-700';
     setState(0);
+    api('/conversations/' + simPhone + '/reset', { method: 'POST' }).catch(() => {}); // limpia el FSM del simulador
     const myEpoch = epoch;
     setTimeout(() => { if (myEpoch !== epoch) return; pushBubble(MSG_WELCOME, 'in'); setState(1); }, 600);
   }
   $('btn-restart').addEventListener('click', boot);
 
-  /* Indicador del encabezado según la configuración */
-  $('ai-status-text').textContent = GEMINI_CONFIG.isLive() ? 'Gemini conectado' : 'Modo demo (sin API key)';
-
   return { get state(){ return state; }, pushSystemNote, boot };
+})();
+
+/* ===== 5. SECCIÓN D · ENTRENA AL BOT (Fin AI style) ===== */
+const KB_CATS = ['general','servicios','productos','pagos','envios'];
+let kbState = { articles: [], policies: [], map: null };
+
+function renderArticles(list){
+  $('kb-empty').classList.toggle('hidden', list.length > 0);
+  $('kb-count').textContent = list.length;
+  $('kb-articles').innerHTML = list.map((a,i) => `
+    <li class="px-4 py-3 rounded-lg border ${a.enabled===false?'border-dashed opacity-50':'border-gray-200'} bg-gray-50">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-sm font-bold text-gray-800 truncate">${esc(a.title||'(sin título)')}</span>
+        <span class="flex items-center gap-1 shrink-0">
+          <span class="text-[10px] font-bold uppercase bg-brand-100 text-brand-800 px-1.5 py-0.5 rounded">${esc(a.category||'general')}</span>
+          <button data-kb-edit="${i}" title="Editar" class="w-7 h-7 rounded text-gray-400 hover:text-brand-700 hover:bg-white"><i class="fa-solid fa-pen"></i></button>
+          <button data-kb-del="${i}" title="Eliminar" class="w-7 h-7 rounded text-gray-400 hover:text-red-600 hover:bg-white"><i class="fa-solid fa-trash-can"></i></button>
+        </span>
+      </div>
+      <p class="text-xs text-gray-500 mt-1 line-clamp-2">${esc((a.content||'').slice(0,160))}</p>
+      ${a.keywords?.length ? `<p class="text-[10px] text-gray-400 mt-1"><i class="fa-solid fa-tags"></i> ${esc(a.keywords.join(', '))}</p>` : ''}
+    </li>`).join('');
+  $('kb-articles').querySelectorAll('[data-kb-del]').forEach(b => b.addEventListener('click', () => { kbState.articles.splice(+b.dataset.kbDel,1); renderArticles(kbState.articles); }));
+  $('kb-articles').querySelectorAll('[data-kb-edit]').forEach(b => b.addEventListener('click', () => {
+    const a = kbState.articles[+b.dataset.kbEdit];
+    $('kb-title').value=a.title||''; $('kb-content').value=a.content||''; $('kb-keywords').value=(a.keywords||[]).join(', '); $('kb-category').value=a.category||'general';
+    $('kb-save-article').dataset.index = b.dataset.kbEdit;
+    $('kb-form').scrollIntoView({behavior:'smooth', block:'center'});
+  }));
+}
+
+$('kb-add-toggle').addEventListener('click', () => $('kb-form').classList.toggle('hidden'));
+$('kb-cancel').addEventListener('click', () => $('kb-form').classList.add('hidden'));
+$('kb-save-article').addEventListener('click', (e) => {
+  const title = $('kb-title').value.trim(), content = $('kb-content').value.trim();
+  if (!title || !content) return showToast('⚠️ El artículo necesita título y contenido.');
+  const art = { id: e.target.dataset.index ? kbState.articles[+e.target.dataset.index].id : undefined,
+    title, content, category: $('kb-category').value,
+    keywords: $('kb-keywords').value.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean), enabled: true };
+  if (e.target.dataset.index) kbState.articles[+e.target.dataset.index] = art; else kbState.articles.unshift(art);
+  delete e.target.dataset.index;
+  $('kb-title').value=''; $('kb-content').value=''; $('kb-keywords').value=''; $('kb-form').classList.add('hidden');
+  renderArticles(kbState.articles);
+});
+
+function renderPolicies(list){
+  $('kb-policies').innerHTML = list.map((p,i) => `
+    <div class="px-4 py-3 rounded-lg border ${p.enabled?'border-gray-200':'border-dashed opacity-60'} bg-gray-50 flex items-start gap-3">
+      <input type="checkbox" data-pol-en="${i}" ${p.enabled?'checked':''} class="mt-1.5 accent-emerald-600"/>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <input data-pol-name="${i}" value="${esc(p.name)}" class="font-bold text-sm text-gray-800 bg-transparent border-b border-transparent focus:border-brand-400 outline-none min-w-[120px]"/>
+          ${p.escalateToHuman ? '<span class="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full"><i class="fa-solid fa-user-clock"></i> escala a humano</span>' : '<span class="text-[10px] font-bold uppercase bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-full">regla IA</span>'}
+          <label class="ml-auto text-[10px] text-gray-500">prioridad <input data-pol-pr="${i}" type="number" value="${p.priority}" class="w-12 text-xs border rounded px-1 py-0.5"/></label>
+        </div>
+        <textarea data-pol-txt="${i}" rows="2" class="w-full mt-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded p-2 outline-none focus:border-brand-400">${esc(p.escalateToHuman ? (p.autoEscalate||'') : (p.instruction||''))}</textarea>
+      </div>
+      <button data-pol-del="${i}" class="w-7 h-7 rounded text-gray-400 hover:text-red-600 shrink-0"><i class="fa-solid fa-trash-can"></i></button>
+    </div>`).join('');
+  const sync = () => list.forEach((p,i) => {
+    p.enabled = document.querySelector(`[data-pol-en="${i}"]`).checked;
+    p.name = document.querySelector(`[data-pol-name="${i}"]`).value;
+    p.priority = +document.querySelector(`[data-pol-pr="${i}"]`).value || 10;
+    if (p.escalateToHuman) p.autoEscalate = document.querySelector(`[data-pol-txt="${i}"]`).value;
+    else p.instruction = document.querySelector(`[data-pol-txt="${i}"]`).value;
+  });
+  $('kb-policies').querySelectorAll('input,textarea').forEach(el => el.addEventListener('change', sync));
+  $('kb-policies').querySelectorAll('[data-pol-del]').forEach(b => b.addEventListener('click', () => { list.splice(+b.dataset.polDel,1); renderPolicies(list); }));
+}
+
+$('kb-add-policy').addEventListener('click', () => {
+  kbState.policies.push({ id:'pol-'+Math.random().toString(36).slice(2,7), name:'Nueva regla', enabled:true, priority:9, escalateToHuman:false, instruction:'' });
+  renderPolicies(kbState.policies);
+});
+$('kb-test').addEventListener('click', async () => {
+  const msg = $('kb-test-input').value.trim(); if (!msg) return;
+  try {
+    const r = await api('/knowledge/test', { method:'POST', body:{ message: msg } });
+    $('kb-test-result').classList.remove('hidden');
+    $('kb-test-result').innerHTML = `
+      <p class="text-xs font-bold ${r.escalationTrigger?'text-red-600':'text-brand-700'}">
+        ${r.escalationTrigger ? '🙋 ESCALA A HUMANO · política: '+esc(r.escalationTrigger.policy)+' ('+esc(r.escalationTrigger.reason)+')' : '✅ LO CONTESTA EL BOT'}
+      </p>
+      <p class="text-[11px] text-gray-500 mt-1">Artículos recuperados para el prompt: <b>${r.retrieved.length ? esc(r.retrieved.map(h=>h.title+' (score '+h.score+')').join(' · ')) : 'ninguno'}</b></p>
+      <details class="mt-1"><summary class="text-[11px] text-gray-400 cursor-pointer">ver system prompt (${r.promptChars} caracteres)</summary>
+      <pre class="text-[10px] text-gray-600 bg-gray-50 rounded p-2 mt-1 max-h-40 overflow-auto whitespace-pre-wrap thin-scroll">${esc(r.promptPreview)}</pre></details>`;
+  } catch (err) { showToast('⚠️ Prueba fallida: ' + err.message); }
+});
+
+async function publishKnowledge(){
+  const btn = $('btn-publish-kb');
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Publicando...';
+  try {
+    await api('/knowledge', { method:'PUT', body: { articles: kbState.articles, policies: kbState.policies, map: kbState.map } });
+    showToast('🧠 Entrenamiento publicado: el bot ya responde con tu base de conocimiento.');
+  } catch (err) {
+    console.error(err); showToast('⚠️ No se pudo publicar: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-brain"></i> Publicar entrenamiento';
+  }
+}
+$('btn-publish-kb').addEventListener('click', publishKnowledge);
+$('btn-test-publish').addEventListener('click', async () => { await publishKnowledge(); $('kb-test-input').value='¿Hacen inyecciones? ¿Tienen macrobiótica?'; $('kb-test').click(); });
+
+function renderMap(map){
+  const TYPE_STYLE = { start:'bg-brand-600', flow:'bg-gray-700', ai:'bg-sky-600', escalation:'bg-amber-500', end:'bg-gray-500' };
+  $('kb-map').innerHTML = map.states.map(s => `
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full ${TYPE_STYLE[s.type]||'bg-gray-400'}"></span>
+        <span class="text-sm font-bold text-gray-800">${esc(s.label)}</span>
+        ${s.id===map.entry?'<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 rounded ml-auto">INICIO</span>':''}
+        ${s.type==='escalation'?'<span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 rounded '+(s.id===map.entry?'':'ml-auto')">🙋 HUMANO</span>':''}
+      </div>
+      ${s.actions?.length?`<p class="text-[11px] text-gray-500 mt-1">${esc(s.actions.join(' · '))}</p>`:''}
+      ${(s.transitions||[]).length ? `<ul class="mt-1.5 space-y-0.5">${s.transitions.map(t=>`<li class="text-[11px] text-gray-600"><i class="fa-solid fa-arrow-right-long text-brand-500 mr-1"></i><b>${esc(t.on)}</b> → ${esc((map.states.find(x=>x.id===t.to)||{label:t.to}).label)}${t.note?` <span class="text-gray-400">(${esc(t.note)})</span>`:''}</li>`).join('')}</ul>`:'<p class="text-[11px] text-gray-300 italic mt-1">estado final</p>'}
+    </div>`).join('<div class="flex justify-center py-0.5"><i class="fa-solid fa-arrow-down-long text-gray-300"></i></div>');
+}
+
+(async () => {
+  try {
+    const [cfg, kn] = await Promise.all([api('/config'), api('/knowledge')]);
+    if (cfg.business_rules) Object.entries(cfg.business_rules).forEach(([k,v]) => { if (k in uiState.toggles) uiState.toggles[k]=!!v; });
+    renderToggles();
+    if (cfg.price_lists?.length){ uiState.files = cfg.price_lists.map(f=>({id:crypto.randomUUID(),name:f.name,size:f.size||0})); renderFiles(); }
+    kbState = { articles: kn.articles, policies: kn.policies, map: kn.map };
+    renderArticles(kbState.articles); renderPolicies(kbState.policies); renderMap(kbState.map);
+    if (kn.isDefault) $('kb-note').classList.remove('hidden');
+  } catch (err) { console.warn('[panel] backend no disponible:', err.message); }
 })();
 
 renderToggles();

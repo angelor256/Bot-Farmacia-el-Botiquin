@@ -113,6 +113,27 @@ function setFsmState(rawPhone, patch) {
   return u.fsm;
 }
 
+/** Contador de malentendidos (mensajes que el FSM no supo enrutar). */
+function bumpMisroutes(rawPhone) {
+  const u = ensureShape(rawPhone);
+  u.fsm.misroutes = (u.fsm.misroutes || 0) + 1;
+  schedulePersist();
+  return u.fsm.misroutes;
+}
+
+/** Reinicia el flujo de un usuario (botón "Reiniciar chat" del panel). */
+function resetUser(rawPhone) {
+  const key = phoneUtil.normalize(rawPhone);
+  const u = users.get(key);
+  if (!u) return false;
+  u.fsm = { state: 0, option: null, branch: null, misroutes: 0 };
+  u.history = [];
+  u.botPaused = null;
+  schedulePersist();
+  log.info(`[reset] flujo reiniciado para ${phoneUtil.mask(key)}`);
+  return true;
+}
+
 /* ---------------- Persistencia en disco (debounced, atómica) ---------------- */
 
 let persistTimer = null;
@@ -148,6 +169,6 @@ loadSnapshot();
 
 module.exports = {
   appendMessage, getRecentHistory, getConversation, listContacts,
-  pauseBot, resumeBot, isBotEnabled, setFsmState, ensureShape,
+  pauseBot, resumeBot, isBotEnabled, setFsmState, ensureShape, bumpMisroutes, resetUser,
   __test: { users, writeSnapshot },
 };
