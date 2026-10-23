@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test/smoke.js && node test/fallback.js"
+    "test": "node test/smoke.js && node test/fallback.js && node test/training.js"
   },
   "dependencies": {
     "axios": "^1.7.9",

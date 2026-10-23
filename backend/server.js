@@ -9,6 +9,7 @@ const config = require('./config');
 const log = require('./utils/logger');
 const webhookRoutes = require('./routes/webhook');
 const apiRoutes = require('./routes/api');
+const trainingRoutes = require('./routes/training');
 
 const app = express();
 
@@ -17,7 +18,7 @@ app.disable('x-powered-by');
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', config.corsOrigin);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 /* El webhook necesita el raw body para validar la firma: se monta ANTES del json() global. */
 app.use('/webhook', webhookRoutes);
 app.use(express.json({ limit: '1mb' }));
+app.use('/api/training', trainingRoutes);
 app.use('/api', apiRoutes);
 
 /* Panel estatico (index.html refactorizado + frontend/js) */

@@ -138,6 +138,27 @@ Para volver a empezar, usa el botón **Reiniciar chat** del panel.
 
 ---
 
+## 6B. Probar el panel "Entrenar al bot" (estilo Fin AI)
+
+Desde el panel principal pulsa el botón verde **Entrenar al bot**, o abre directamente http://localhost:3000/entrenamiento.html
+
+| Pestaña | Qué probar |
+|---------|-----------|
+| **Contenido** | Crea un snippet (ej. "Aceptamos SINPE Móvil al 8888-0000"), pon **Estado: Publicado** y pregunta por ello en el simulador. Prueba una fecha "Vigente hasta" pasada: el bot ya no debe usarlo. |
+| **Guidance** | Cambia el *Tono* y la *Longitud*, guarda. Crea una regla (ej. "Despídete siempre con Pura vida") en estado **Publicada** y comprueba que el bot la sigue. Una regla en *Borrador* no se aplica. |
+| **Escalado** | Activa la regla de ejemplo "Pagos y devoluciones" y escribe "necesito mi factura electrónica": el bot debe pasar a humano. Usa "Probar el clasificador" para ver qué intención detecta. |
+| **Procedimientos** | Pulsa **Probar** en "Pedido a domicilio" (escribe un producto y una dirección, una por línea). Para usarlo de verdad, edítalo y ponlo en **Publicado**; en el simulador escribe "quiero un pedido a domicilio". |
+| **Test** | Pulsa **Ejecutar todas**. Cada pregunta muestra qué contenido/regla usó. Valora con **Evaluar**. Tras cambiar contenido o guidance, vuelve a ejecutar y compara. **Informe CSV** descarga los resultados. |
+| **Recomendaciones** | Aquí aparecen las preguntas que el bot no supo responder (más frecuentes primero). Pulsa **Enseñar respuesta**, escribe la respuesta correcta y el bot la sabrá desde ese momento. |
+| **Análisis** | Porcentaje de mensajes resueltos por el bot, escalados y sin respuesta; temas más frecuentes; contenido más usado. |
+| **Changelog** | Registro de cada cambio que hagas. |
+
+Notas:
+- Los datos del entrenamiento se guardan en `backend/data/training.json` (no se sube a GitHub). Si lo borras, vuelven los ejemplos iniciales.
+- Con `npm test` se corren también las pruebas automáticas de todo esto.
+
+---
+
 ## 7. Cómo saber si todo está bien (checklist final)
 
 - [ ] `node -v` muestra v18 o mayor
