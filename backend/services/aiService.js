@@ -54,7 +54,7 @@ function classify(status, bodyText = '') {
       // propios y jamás funcionarán contra generativelanguage.googleapis.com.
       b.includes('access_token_type_unsupported')) return 'auth';
   if (status === 404 || b.includes('not found') || b.includes('is not found for api version')) return 'notfound';
-  if (status === 429 || b.includes('quota') || b.includes('rate')) return 'quota';
+  if (status === 429 || b.includes('quota') || /\brate\b/.test(b)) return 'quota';
   if (status === 400 && (b.includes('safety') || b.includes('block') || b.includes('recitation'))) return 'blocked';
   if (status >= 500) return 'server';
   return 'unknown';

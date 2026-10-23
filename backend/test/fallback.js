@@ -1,6 +1,6 @@
 'use strict';
 /** Prueba de la cadena de fallback con proveedores simulados (sin red real). */
-process.env.GEMINI_API_KEY = 'fake-key';
+process.env.GEMINI_API_KEY = 'AIzaFakeKeyForTests';
 process.env.GROQ_API_KEY = 'fake-groq';
 process.env.OPENROUTER_API_KEY = '';
 const assert = require('assert');

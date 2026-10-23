@@ -127,13 +127,9 @@
   "sim-panel": {
     "phone": "sim-panel",
     "name": null,
-    "botPaused": {
-      "pausedBy": "auto-solicitado-por-cliente",
-      "reason": "Solicitud de humano",
-      "pausedAt": 1792621954887
-    },
+    "botPaused": null,
     "fsm": {
-      "state": 4,
+      "state": 3,
       "option": "Compra de productos",
       "branch": "Pavas Centro",
       "misroutes": 0
@@ -142,94 +138,101 @@
       {
         "role": "user",
         "text": "hola",
-        "ts": 1792621954782,
+        "ts": 1792760535604,
         "via": "client"
       },
       {
         "role": "model",
         "text": "¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle, digite el número de la opción:\n\n1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales",
-        "ts": 1792621954783,
+        "ts": 1792760535605,
         "via": "bot"
       },
       {
         "role": "user",
         "text": "1",
-        "ts": 1792621954800,
+        "ts": 1792760535648,
         "via": "client"
       },
       {
         "role": "model",
         "text": "¡Con mucho gusto! 😊💙\n\n¿En cuál de nuestras sucursales desea realizar su pedido?\n\n1️⃣ Pavas Centro\n2️⃣ Lomas del Río\n\nPor favor, digite 1 o 2 para continuar con su pedido. 💊",
-        "ts": 1792621954800,
+        "ts": 1792760535648,
         "via": "bot"
       },
       {
         "role": "user",
         "text": "1",
-        "ts": 1792621954838,
+        "ts": 1792760535693,
         "via": "client"
       },
       {
         "role": "model",
         "text": "¡Perfecto! 😊 Sera un gusto atenderle desde nuestra Sucursal Pavas Centro. 💙\n\nCuenteme, ¿en que le puedo ayudar?",
-        "ts": 1792621954838,
+        "ts": 1792760535695,
         "via": "bot"
       },
       {
         "role": "user",
-        "text": "¿a qué hora abren?",
-        "ts": 1792621954861,
+        "text": "cual es el horario",
+        "ts": 1792760535738,
         "via": "client"
       },
       {
         "role": "model",
         "text": "💙 Sucursales y horarios\nPavas Centro (frente a la feria del farmer, L-20) y Lomas del Río (100 m sur de la entrada principal). Lun-Sáb 7:00-22:00, Dom 8:00-20:00. Tel 2213 5670.",
-        "ts": 1792621954864,
-        "via": "bot"
-      },
-      {
-        "role": "user",
-        "text": "quiero hablar con un humano",
-        "ts": 1792621954887,
-        "via": "client"
-      },
-      {
-        "role": "model",
-        "text": "Perfecto, le paso con un asesor humano 💙. En breve le atenderá una persona por este medio.",
-        "ts": 1792621954887,
+        "ts": 1792760535741,
         "via": "bot"
       },
       {
         "role": "user",
         "text": "hola",
-        "ts": 1792621972559,
+        "ts": 1792760535800,
         "via": "client"
       },
       {
         "role": "user",
-        "text": "1",
-        "ts": 1792621972583,
+        "text": "gracias",
+        "ts": 1792760535853,
         "via": "client"
       },
       {
-        "role": "user",
-        "text": "1",
-        "ts": 1792621972643,
-        "via": "client"
+        "role": "model",
+        "text": "Estamos teniendo problemas de conexión con el asistente virtual 💙. Escriba su consulta y se la pasamos a nuestro equipo en la sucursal.",
+        "ts": 1792760535854,
+        "via": "bot"
       },
       {
-        "role": "user",
-        "text": "¿tienen inyecciones?",
-        "ts": 1792621972671,
-        "via": "client"
-      },
-      {
-        "role": "user",
-        "text": "quiero hablar con un humano",
-        "ts": 1792621972696,
-        "via": "client"
+        "role": "model",
+        "text": "hola humano",
+        "ts": 1792760535898,
+        "via": "human"
       }
     ],
-    "updatedAt": 1792621972696
+    "updatedAt": 1792760535898
+  },
+  "50688881111": {
+    "phone": "50688881111",
+    "name": "Ana",
+    "botPaused": null,
+    "fsm": {
+      "state": 0,
+      "option": null,
+      "branch": null
+    },
+    "history": [
+      {
+        "role": "user",
+        "text": "hola",
+        "ts": 1792760535909,
+        "via": "client"
+      },
+      {
+        "role": "model",
+        "text": "¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle, digite el número de la opción:\n\n1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales",
+        "ts": 1792760535909,
+        "via": "bot"
+      }
+    ],
+    "updatedAt": 1792760535909
   }
 }
