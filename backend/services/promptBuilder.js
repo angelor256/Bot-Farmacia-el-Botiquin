@@ -5,6 +5,7 @@
  */
 
 const { buildKnowledgePromptPart } = require('./knowledgeService');
+const training = require('./trainingService');
 
 const MENU = `1️⃣ Compra de productos\n2️⃣ Consulta Farmacéutica\n3️⃣ Macrobiótica y Suplementos\n4️⃣ Sugerencias y mejoras de servicio\n5️⃣ Horarios y direcciones de nuestras sucursales`;
 
@@ -28,10 +29,12 @@ function buildSystemPrompt(ctx = {}) {
   const kbPart = ctx.knowledge === false ? '' : '\n' + buildKnowledgePromptPart({ message: ctx.message || '' });
   return `Eres "${ctx.botName || 'Dr. Boti'}", asistente virtual de ${ctx.pharmacy || 'Farmacia El Botiquín'}, una farmacia comunitaria en Lomas del Río, Pavas, San José, Costa Rica. Teléfono: 2213 5670.
 Servicios: medicamentos con y sin receta, cuidado personal, higiene, salud infantil, inyecciones en el local, y control de presión y glucosa.
+Horario: lunes a sábado de 7:00 a 22:00 y domingo de 8:00 a 20:00. Sucursales: Pavas Centro (frente a la feria del farmer, L-20) y Lomas del Río (100 m sur de la entrada principal).
 
 ESTILO
 - Español costarricense, cálido y profesional, tratando de "usted".
-- Máximo 5 líneas. Formato WhatsApp (*negritas* permitidas), emojis con moderación.
+${training.basicsPromptLines()}
+- Formato WhatsApp (*negritas* permitidas), emojis con moderación.
 - Responde directamente lo que el cliente pregunta. No repitas saludos ni frases de relleno.
 - Usa el HISTORIAL de la conversación para no repetir preguntas ya respondidas.
 - Si falta un dato clave (para quién es, síntomas, alergias), haz UNA sola pregunta.
@@ -51,7 +54,7 @@ REGLAS DEL DUEÑO (obedécelas siempre)
 
 CONTEXTO DEL CLIENTE: sucursal ${ctx.branch || 'sin definir'}; motivo: ${ctx.option || 'sin definir'}.
 Menú de referencia: ${MENU.replace(/\n/g, ' | ')}
-Si preguntan algo ajeno a la farmacia, redirige amablemente.${kbPart}`;
+Si preguntan algo ajeno a la farmacia, redirige amablemente.${ctx.knowledge === false ? '' : training.guidancePromptPart()}${kbPart}`;
 }
 
 module.exports = { buildSystemPrompt, MENU, DEFAULT_RULES };

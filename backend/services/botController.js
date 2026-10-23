@@ -12,6 +12,7 @@ const store = require('./store');
 const ai = require('./aiService');
 const wa = require('./whatsappService');
 const kb = require('./knowledgeService');
+const training = require('./trainingService');
 const log = require('../utils/logger');
 const { mask, normalize } = require('../utils/phone');
 
@@ -63,7 +64,7 @@ async function replyTo(phone, text) {
 }
 
 /* ---------- FSM por telefono (los números del menú SIEMPRE tienen prioridad) ---------- */
-function handleOptionChoice(phone, msg) {
+function handleOptionChoice(phone, msg, meta = {}) {
   if (msg === '1' || msg === '2') {
     store.setFsmState(phone, { state: 2, option: OPTION_NAMES[msg], misroutes: 0 });
     return MSG_BRANCHES;
@@ -86,21 +87,23 @@ function handleOptionChoice(phone, msg) {
   const free = kb.retrieve(msg, { topK: 1 })[0];
   if (free && free.score >= 3) return '💙 Sobre su consulta:\n\n' + free.excerpt + '\n\n¿Desea continuar con un pedido? Digite el número de la opción:\n\n' + MENU;
   store.bumpMisroutes(phone);
+  if (msg.length >= 8) training.noteGap({ question: msg, reason: 'menu-no-entendido', intent: meta.intent });
   return 'Disculpe, no entendi 😅. Por favor digite el número de la opcion correspondiente:\n\n' + MENU;
 }
 
-function handleBranchChoice(phone, msg) {
+function handleBranchChoice(phone, msg, meta = {}) {
   if (msg === '1' || msg === '2') {
     const branch = BRANCH_NAMES[msg];
     store.setFsmState(phone, { state: 3, branch, misroutes: 0 });
     return '¡Perfecto! 😊 Sera un gusto atenderle desde nuestra Sucursal ' + branch + '. 💙\n\nCuenteme, ¿en que le puedo ayudar?';
   }
   store.bumpMisroutes(phone);
+  if (msg.length >= 8) training.noteGap({ question: msg, reason: 'sucursal-no-entendido', intent: meta.intent });
   return 'Por favor digite 1️⃣ Pavas Centro o 2️⃣ Lomas del Rio para continuar con su pedido. 💊';
 }
 
 /** Estado 3: llama a la IA con historial del usuario y fallback garantizado. */
-async function handleAiStage(phone, msg) {
+async function handleAiStage(phone, msg, meta = {}) {
   const u = store.ensureShape(phone);
   // Bug "no responde correctamente" (ramo de menú): si el cliente escribe texto
   // libre en estado 2, antes se re-pregaba por la sucursal INDEFINIDAMENTE y el
@@ -119,11 +122,22 @@ async function handleAiStage(phone, msg) {
   // El destino libre ya no es un laberinto: si la IA respondió, reseteamos el
   // contador para que una futura mala lectura no escale de forma encadenada.
   store.setFsmState(phone, { misroutes: 0 });
+  const hits = kb.retrieve(msg, { topK: 3 });
+  kb.markUsed(hits.map((h) => h.id));
+  meta.sources = hits.map((h) => h.title);
+  meta.provider = result.provider;
+  meta.outcome = 'ia';
+  if (result.provider === 'fallback-local' && result.model === 'none') {
+    // Ni la IA ni la base local supieron responder: queda como recomendación para enseñarle al bot.
+    meta.outcome = 'fallback';
+    training.noteGap({ question: msg, reason: 'ia-sin-respuesta', intent: meta.intent });
+  }
   // Protocolo de traspaso estilo Fin: la IA añade un token INVISIBLE cuando una
   // política exige escalar; lo retiramos del texto y pausamos el bot para ESTE usuario.
   if (/\[\[ESCALAR_HUMANO\]\]/.test(result.text)) {
     store.pauseBot(phone, { pausedBy: 'ia-politica', reason: 'token-de-escalado' });
-    store.setFsmState(phone, { state: 4 });
+    store.setFsmState(phone, { state: 4, proc: null });
+    meta.outcome = 'escalado';
     log.info('[bot] IA solicito escalado segun politica -> bot pausado para ' + mask(phone));
     return result.text.replace(/\s*\[\[ESCALAR_HUMANO\]\]\s*/g, '').trim();
   }
@@ -131,6 +145,53 @@ async function handleAiStage(phone, msg) {
   // pregunta, avisamos honestamente y ofrecemos la opción humana en vez de
   // dejar al cliente dando vueltas sobre un menú que no pidió.
   return result.text;
+}
+
+/** Traspaso a humano: pausa el bot para ESTE número y cancela cualquier procedimiento en curso. */
+function escalate(phone, by, reason) {
+  store.pauseBot(phone, { pausedBy: by, reason });
+  store.setFsmState(phone, { state: 4, proc: null });
+}
+
+/** Aplica el resultado de un paso de procedimiento (continúa, termina o traspasa) y devuelve el texto. */
+function applyProcStep(phone, proc, r, meta) {
+  if (!r.done) {
+    store.setFsmState(phone, { proc: { id: proc.id, i: r.i, data: r.data } });
+    meta.outcome = 'procedimiento';
+  } else if (r.done === 'handoff') {
+    store.pauseBot(phone, { pausedBy: 'procedimiento', reason: proc.name });
+    store.setFsmState(phone, { state: 4, proc: null, summary: { procedure: proc.name, data: r.data, at: Date.now() } });
+    training.procStat(proc.id, 'handoffs');
+    meta.outcome = 'procedimiento-traspaso';
+  } else {
+    store.setFsmState(phone, { proc: null });
+    training.procStat(proc.id, 'completed');
+    meta.outcome = 'procedimiento-fin';
+  }
+  return r.out.join('\n\n');
+}
+
+/** Procedimientos: continúa el que está en curso o arranca uno cuyo disparador coincide. null = no aplica. */
+function handleProcedure(phone, text, meta, isMenuNumber) {
+  const fsm = store.ensureShape(phone).fsm;
+  if (fsm.proc) {
+    const proc = training.getProcedure(fsm.proc.id);
+    if (!proc || proc.state !== 'live') { store.setFsmState(phone, { proc: null }); return null; } // despublicado a mitad de camino
+    if (/^(cancelar|cancela|salir)$/i.test(text.trim())) {
+      store.setFsmState(phone, { proc: null });
+      meta.outcome = 'procedimiento';
+      return 'Listo, cancelé el proceso. ¿En qué más le puedo ayudar? 💙';
+    }
+    return applyProcStep(phone, proc, training.continueProcedure(proc, fsm.proc, text), meta);
+  }
+  if (fsm.state >= 3 && !isMenuNumber) {
+    const proc = training.findProcedure(text, meta.intent);
+    if (proc) {
+      training.procStat(proc.id, 'started');
+      return applyProcStep(phone, proc, training.startProcedure(proc), meta);
+    }
+  }
+  return null;
 }
 
 /**
@@ -154,25 +215,47 @@ function processIncoming({ from, text, name }) {
     if (name && !store.ensureShape(phone).name) store.ensureShape(phone).name = name;
 
     const fsm = store.ensureShape(phone).fsm;
+    const isMenuNumber = /^\d{1,2}$/.test(text.trim());
+    const meta = { outcome: 'menu', intent: training.classifyIntent(text), sources: [], provider: null };
+    store.setFsmState(phone, { lastIntent: meta.intent });
     let reply;
     try {
-      // Reglas de escalado ANTES de gastar tokens de IA (deterministas y gratis).
-      // Los números del menú quedan excluidos: el flujo FSM tiene prioridad.
-      const trig = kb.detectEscalation(text, { policies: kb.getKnowledge().policies, fsm });
-      if (trig) {
-        store.pauseBot(phone, { pausedBy: 'auto-' + trig.reason, reason: trig.policy });
-        store.setFsmState(phone, { state: 4 });
+      // Orden de decisión (de lo determinista a lo interpretado), como Fin:
+      // Safety Guard → reglas de escalado → políticas → procedimiento → menú / IA.
+      const safety = training.checkSafety(text);
+      const rule = !safety && !isMenuNumber ? training.evaluateRules(text, { intent: meta.intent, misroutes: fsm.misroutes }) : null;
+      // Los números del menú quedan excluidos del escalado: el flujo FSM tiene prioridad.
+      const trig = !safety && !rule ? kb.detectEscalation(text, { policies: kb.getKnowledge().policies, fsm }) : null;
+      if (safety) {
+        escalate(phone, 'seguridad-' + safety.id, 'Safety Guard');
+        meta.outcome = 'seguridad';
+        log.info('[bot] Safety Guard (' + safety.id + ') para ' + mask(phone));
+        reply = safety.message;
+      } else if (rule) {
+        escalate(phone, 'regla-' + rule.reason, rule.policy);
+        meta.outcome = 'escalado';
+        log.info('[bot] regla de escalado "' + rule.policy + '" para ' + mask(phone));
+        reply = rule.message || MSG_HUMAN_TAKEOVER;
+      } else if (trig) {
+        escalate(phone, 'auto-' + trig.reason, trig.policy);
+        meta.outcome = 'escalado';
         log.info('[bot] escalado automático (' + trig.reason + ') para ' + mask(phone));
         reply = MSG_HUMAN_TAKEOVER;
-      } else if (fsm.state <= 1) reply = handleOptionChoice(phone, text);
-      else if (fsm.state === 2) reply = handleBranchChoice(phone, text);
-      else reply = await handleAiStage(phone, text);
+      } else {
+        const procReply = handleProcedure(phone, text, meta, isMenuNumber);
+        if (procReply !== null) reply = procReply;
+        else if (fsm.state <= 1) reply = handleOptionChoice(phone, text, meta);
+        else if (fsm.state === 2) reply = handleBranchChoice(phone, text, meta);
+        else reply = await handleAiStage(phone, text, meta);
+      }
     } catch (err) {
       log.error('[bot] error inesperado en el flujo:', err);
+      meta.outcome = 'fallback';
       reply = ai.defaultFallback(); // NUNCA dejar al cliente colgado
     }
     await replyTo(phone, reply);
-    return { handled: true, reply };
+    training.recordEvent({ phone: mask(phone), intent: meta.intent, outcome: meta.outcome, provider: meta.provider, sources: meta.sources, question: text.slice(0, 200) });
+    return { handled: true, reply, outcome: meta.outcome, intent: meta.intent };
   });
 }
 

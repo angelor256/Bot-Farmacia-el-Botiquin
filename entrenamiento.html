@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entrenar al Bot · Farmacia El Botiquín</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script>
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+    colors: { brand: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' } },
+  } } }
+</script>
+<style>
+  body{ font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+  .tab-btn{ padding:.6rem .9rem; font-size:.8rem; font-weight:600; color:#6b7280; border-bottom:2px solid transparent; white-space:nowrap; }
+  .tab-btn:hover{ color:#047857; }
+  .tab-btn.active{ color:#047857; border-color:#059669; }
+  .inp{ width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.5rem .75rem; font-size:.85rem; background:#fff; }
+  .inp:focus{ outline:2px solid #34d399; outline-offset:0; border-color:#34d399; }
+  .btn{ display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem; font-weight:700; padding:.45rem .8rem; border-radius:.5rem; border:1px solid #e5e7eb; background:#fff; color:#374151; }
+  .btn:hover{ border-color:#34d399; color:#047857; }
+  .btn-primary{ background:#059669; color:#fff; border-color:#059669; }
+  .btn-primary:hover{ background:#047857; color:#fff; }
+  .btn-danger:hover{ border-color:#f87171; color:#dc2626; }
+  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:.9rem; padding:1rem; box-shadow:0 2px 8px -2px rgba(0,0,0,.05); }
+  .badge{ display:inline-block; font-size:.68rem; font-weight:700; padding:.15rem .5rem; border-radius:9999px; }
+  .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; }
+  th{ text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; padding:.5rem .6rem; }
+  td{ padding:.55rem .6rem; font-size:.82rem; vertical-align:top; border-top:1px solid #f3f4f6; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white"><i class="fa-solid fa-graduation-cap"></i></div>
+      <div>
+        <h1 class="text-lg font-extrabold leading-tight">Entrenar al <span class="text-brand-600">Bot</span></h1>
+        <p class="text-xs text-gray-500">Enséñale: contenido, reglas, procedimientos y pruebas (estilo Fin AI)</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="ai-status" class="hidden sm:inline-block badge bg-gray-100 text-gray-600">…</span>
+      <a href="index.html" class="btn"><i class="fa-solid fa-comments"></i> Panel y simulador</a>
+    </div>
+  </div>
+  <nav id="tabs" class="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto"></nav>
+</header>
+
+<main id="view" class="max-w-6xl mx-auto px-4 py-6"></main>
+
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-4"></div>
+<div id="toast" class="fixed bottom-4 right-4 z-[60] space-y-2"></div>
+
+<script>
+'use strict';
+/* ===== Conexión con el backend (igual que index.html) ===== */
+const API_BASE = (location.protocol === 'file:' || location.hostname === '') ? 'http://localhost:3000' : '';
+const ADMIN_TOKEN = (() => {
+  const p = new URLSearchParams(location.search).get('token');
+  if (p) return p;
+  const saved = localStorage.getItem('bot_admin_token') || '';
+  if (location.hostname && location.hostname !== 'localhost') return saved;
+  return saved || 'cambia-este-token';
+})();
+localStorage.setItem('bot_admin_token', ADMIN_TOKEN);
+
+async function api(path, { method = 'GET', body, raw } = {}) {
+  const res = await fetch(API_BASE + '/api' + path, {
+    method, headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (raw) { if (!res.ok) throw new Error('HTTP ' + res.status); return res; }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+  return data;
+}
+const T = (p, o) => api('/training' + p, o);
+
+/* ===== Utilidades de UI ===== */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const csv = (v) => (Array.isArray(v) ? v.join(', ') : v || '');
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+
+function toast(msg, err) {
+  const el = document.createElement('div');
+  el.className = 'px-4 py-2 rounded-lg shadow-lg text-sm font-semibold text-white ' + (err ? 'bg-red-600' : 'bg-brand-700');
+  el.textContent = msg; $('toast').appendChild(el);
+  setTimeout(() => el.remove(), err ? 6000 : 2800);
+}
+/** Ejecuta una acción mostrando errores como toast. */
+async function act(fn, okMsg) {
+  try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, true); return undefined; }
+}
+
+const BADGE = { live: 'bg-emerald-100 text-emerald-700', draft: 'bg-amber-100 text-amber-700', paused: 'bg-gray-200 text-gray-600' };
+const STATE_ES = { live: 'Publicado', draft: 'Borrador', paused: 'En pausa' };
+const stateBadge = (s) => `<span class="badge ${BADGE[s] || BADGE.draft}">${STATE_ES[s] || s}</span>`;
+
+/** Modal de formulario genérico. fields: {k,label,type,options,hint,rows,placeholder} */
+function form({ title, fields, values = {}, submit = 'Guardar', mono = false, onSubmit }) {
+  const inputs = fields.map((f) => {
+    const v = values[f.k] ?? f.default ?? '';
+    let ctl;
+    if (f.type === 'textarea') ctl = `<textarea name="${f.k}" rows="${f.rows || 4}" class="inp ${f.mono ? 'mono' : ''}" placeholder="${esc(f.placeholder || '')}">${esc(Array.isArray(v) ? v.join('\n') : v)}</textarea>`;
+    else if (f.type === 'select') ctl = `<select name="${f.k}" class="inp">${f.options.map(([val, lab]) => `<option value="${esc(val)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}</select>`;
+    else if (f.type === 'checkbox') ctl = `<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''} /> ${esc(f.checkLabel || '')}</label>`;
+    else ctl = `<input name="${f.k}" type="${f.type || 'text'}" class="inp" value="${esc(Array.isArray(v) ? v.join(', ') : v)}" placeholder="${esc(f.placeholder || '')}" />`;
+    return `<div><label class="block text-xs font-bold text-gray-600 mb-1">${esc(f.label)}</label>${ctl}${f.hint ? `<p class="text-[11px] text-gray-500 mt-1">${f.hint}</p>` : ''}</div>`;
+  }).join('');
+  const m = $('modal');
+  m.innerHTML = `<form class="card w-full max-w-2xl mt-8 space-y-3"><div class="flex justify-between items-center"><h3 class="font-extrabold">${esc(title)}</h3><button type="button" class="btn" data-close>✕</button></div>${inputs}<div class="flex justify-end gap-2 pt-2"><button type="button" class="btn" data-close>Cancelar</button><button class="btn btn-primary">${esc(submit)}</button></div></form>`;
+  m.classList.remove('hidden');
+  m.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeModal));
+  m.querySelector('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const out = {};
+    for (const f of fields) {
+      const el = e.target.elements[f.k];
+      out[f.k] = f.type === 'checkbox' ? el.checked : el.value;
+    }
+    const r = await act(() => onSubmit(out));
+    if (r !== undefined) { closeModal(); render(); }
+  });
+}
+function closeModal() { $('modal').classList.add('hidden'); $('modal').innerHTML = ''; }
+function info(title, html) {
+  $('modal').innerHTML = `<div class="card w-full max-w-2xl mt-8"><div class="flex justify-between items-center mb-3"><h3 class="font-extrabold">${esc(title)}</h3><button class="btn" data-close>✕</button></div>${html}</div>`;
+  $('modal').classList.remove('hidden');
+  $('modal').querySelector('[data-close]').addEventListener('click', closeModal);
+}
+const confirmDel = (what) => confirm(`¿Eliminar ${what}? Esta acción no se puede deshacer.`);
+const header = (title, sub, btns = '') => `<div class="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 class="text-xl font-extrabold">${title}</h2><p class="text-sm text-gray-500 max-w-2xl">${sub}</p></div><div class="flex gap-2 flex-wrap">${btns}</div></div>`;
+const empty = (t) => `<div class="card text-center text-sm text-gray-500 py-8">${t}</div>`;
+
+/* ===== Pestañas ===== */
+const TABS = [
+  ['resumen', 'fa-compass', 'Resumen'], ['contenido', 'fa-book', 'Contenido'], ['guidance', 'fa-sliders', 'Guidance'],
+  ['escalado', 'fa-user-shield', 'Escalado'], ['procedimientos', 'fa-diagram-project', 'Procedimientos'], ['test', 'fa-vial', 'Test'],
+  ['recomendaciones', 'fa-lightbulb', 'Recomendaciones'], ['analisis', 'fa-chart-line', 'Análisis'], ['changelog', 'fa-clock-rotate-left', 'Changelog'],
+];
+let current = (location.hash || '#resumen').slice(1);
+if (!TABS.some((t) => t[0] === current)) current = 'resumen';
+
+function drawTabs() {
+  $('tabs').innerHTML = TABS.map(([id, ic, lab]) => `<button class="tab-btn ${id === current ? 'active' : ''}" data-tab="${id}"><i class="fa-solid ${ic} mr-1"></i>${lab}</button>`).join('');
+}
+$('tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  current = b.dataset.tab; location.hash = current; render();
+});
+
+async function render() {
+  drawTabs();
+  $('view').innerHTML = '<p class="text-sm text-gray-500">Cargando…</p>';
+  try { $('view').innerHTML = await VIEWS[current](); await (AFTER[current] && AFTER[current]()); }
+  catch (e) { $('view').innerHTML = `<div class="card border-red-200 text-red-700 text-sm">No se pudo cargar: ${esc(e.message)}. ¿Está corriendo el backend (<span class="mono">npm start</span>) y abriste esta página desde <span class="mono">http://localhost:3000</span>?</div>`; }
+}
+
+const VIEWS = {}; const AFTER = {};
+const ACT = {}; // acciones: data-act="nombre" data-id="..." data-id2="..."
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const fn = ACT[el.dataset.act]; if (fn) fn(el.dataset.id, el.dataset.id2, el);
+});
+
+/* ---------- Resumen ---------- */
+VIEWS.resumen = async () => {
+  const o = await T('/overview');
+  const card = (tab, ic, title, big, small, desc) => `<button data-tabgo="${tab}" class="card text-left hover:border-brand-400 transition"><div class="flex items-center gap-2 text-brand-700 font-bold text-sm"><i class="fa-solid ${ic}"></i>${title}</div><div class="text-2xl font-extrabold mt-1">${big}</div><div class="text-xs text-gray-500">${small}</div><p class="text-xs text-gray-600 mt-2">${desc}</p></button>`;
+  return header('Cómo aprende el bot', 'Igual que Fin: unas piezas deciden <b>si</b> actúa, otras definen <b>qué sabe y cómo habla</b>, otras <b>qué hace</b>. Lo que debe cumplirse siempre es código (determinista); lo demás lo interpreta la IA con límites.')
+  + `<div class="card mb-4 text-sm"><b>Camino de un mensaje:</b> Cliente escribe → <b>Safety Guard</b> (temas sensibles) → <b>Reglas de escalado</b> → <b>Políticas</b> → <b>Procedimiento</b> (si hay uno que aplica) → <b>IA</b> con <b>Contenido</b> + <b>Guidance</b>.<br><b>Ciclo de mejora:</b> Entrenar → <b>Probar</b> → Publicar → <b>Analizar</b> → <b>Recomendaciones</b> piden cambios → Entrenar.</div>`
+  + `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">`
+  + card('contenido', 'fa-book', 'Contenido', o.content.live, `${o.content.total} en total · ${o.content.drafts} borradores`, 'Artículos y snippets que el bot puede citar, con vigencia por fechas.')
+  + card('guidance', 'fa-sliders', 'Guidance', o.guidance.live, `${o.guidance.total} reglas · tono ${o.guidance.basics.tone}`, 'Cómo debe comportarse y hablar, en lenguaje natural.')
+  + card('escalado', 'fa-user-shield', 'Escalado', o.escalation.enabled, `${o.escalation.total} reglas`, 'Cuándo pasa a una persona, por condición exacta. Más Safety Guard siempre activo.')
+  + card('procedimientos', 'fa-diagram-project', 'Procedimientos', o.procedures.live, `${o.procedures.total} en total`, 'Pasos con preguntas, ramas y traspaso con resumen.')
+  + card('test', 'fa-vial', 'Test', o.tests.questions, `${o.tests.groups} grupos`, 'Banco de preguntas para comprobar que nada se rompe tras un cambio.')
+  + card('recomendaciones', 'fa-lightbulb', 'Recomendaciones', o.recommendations.open, 'abiertas', 'Preguntas reales que el bot no supo responder: enséñale la respuesta.')
+  + `</div>`;
+};
+AFTER.resumen = () => document.querySelectorAll('[data-tabgo]').forEach((b) => b.addEventListener('click', () => { current = b.dataset.tabgo; location.hash = current; render(); }));
+
+/* ---------- Contenido ---------- */
+const CONTENT_FIELDS = [
+  { k: 'title', label: 'Título', placeholder: 'Ej.: Formas de pago' },
+  { k: 'content', label: 'Contenido (lo que el bot puede decir)', type: 'textarea', rows: 6, hint: 'Escriba hechos concretos. El bot los cita y no inventa fuera de ellos.' },
+  { k: 'type', label: 'Tipo', type: 'select', options: [['public', 'Artículo público'], ['internal', 'Artículo interno (solo para el bot)'], ['snippet', 'Snippet (respuesta corta y exacta)']] },
+  { k: 'keywords', label: 'Palabras clave', hint: 'Separadas por coma. Ayudan al bot a encontrar este contenido.' },
+  { k: 'state', label: 'Estado', type: 'select', options: [['live', 'Publicado'], ['draft', 'Borrador (el bot no lo usa)']] },
+  { k: 'validFrom', label: 'Vigente desde (opcional)', type: 'date' },
+  { k: 'validTo', label: 'Vigente hasta (opcional)', type: 'date', hint: 'Útil para promociones con fecha de inicio y fin.' },
+];
+VIEWS.contenido = async () => {
+  const { articles } = await T('/content');
+  const TYPE = { public: 'Público', internal: 'Interno', snippet: 'Snippet' };
+  const rows = articles.map((a) => `<tr><td><b>${esc(a.title)}</b><div class="text-xs text-gray-500">${esc(a.content.slice(0, 110))}${a.content.length > 110 ? '…' : ''}</div></td>
+    <td>${TYPE[a.type]}</td><td>${stateBadge(a.state)}${a.state === 'live' && !a.active ? ' <span class="badge bg-red-100 text-red-700" title="Fuera de su ventana de vigencia">fuera de fecha</span>' : ''}</td>
+    <td class="text-xs">${a.validFrom || a.validTo ? `${a.validFrom || '…'} → ${a.validTo || '…'}` : 'Siempre'}</td><td>${a.used}</td>
+    <td class="whitespace-nowrap"><button class="btn" data-act="c-edit" data-id="${a.id}">Editar</button> <button class="btn btn-danger" data-act="c-del" data-id="${a.id}">✕</button></td></tr>`).join('');
+  return header('Contenido', 'La biblioteca de conocimiento del bot. “Usos” cuenta cuántas veces ayudó a responder (como Reports en Fin).',
+    '<button class="btn" data-act="c-import"><i class="fa-solid fa-file-import"></i> Importar texto</button><button class="btn btn-primary" data-act="c-new"><i class="fa-solid fa-plus"></i> Nuevo contenido</button>')
+    + (articles.length ? `<div class="card p-0 overflow-x-auto"><table class="w-full"><thead><tr><th>Contenido</th><th>Tipo</th><th>Estado</th><th>Vigencia</th><th>Usos</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : empty('Aún no hay contenido. Cree un snippet o importe texto.'));
+};
+ACT['c-new'] = () => form({ title: 'Nuevo contenido', fields: CONTENT_FIELDS, values: { state: 'live', type: 'snippet' }, onSubmit: (v) => T('/content', { method: 'POST', body: { ...v, keywords: v.keywords.split(',').map((x) => x.trim()).filter(Boolean) } }) });
+ACT['c-edit'] = async (id) => { const { articles } = await T('/content'); const a = articles.find((x) => x.id === id);
+  form({ title: 'Editar contenido', fields: CONTENT_FIELDS, values: a, onSubmit: (v) => T('/content/' + id, { method: 'PUT', body: { ...v, keywords: v.keywords.split(',').map((x) => x.trim()).filter(Boolean) } }) }); };
+ACT['c-del'] = async (id) => { if (confirmDel('este contenido')) { await act(() => T('/content/' + id, { method: 'DELETE' }), 'Eliminado'); render(); } };
+ACT['c-import'] = () => form({ title: 'Importar texto', submit: 'Importar como borradores', fields: [
+  { k: 'text', label: 'Pegue el texto', type: 'textarea', rows: 10, hint: 'Si usa títulos con <span class="mono"># Título</span>, cada sección será un contenido. Si no, cada párrafo separado por una línea en blanco. Se crean como <b>borradores</b> para que los revise.' },
+  { k: 'type', label: 'Tipo', type: 'select', options: [['snippet', 'Snippet'], ['public', 'Artículo público']] }],
+  onSubmit: async (v) => { const r = await T('/content/import', { method: 'POST', body: v }); toast(r.created + ' borradores creados'); return r; } });
+
+/* ---------- Guidance ---------- */
+const CAT_ES = { communication: 'Estilo de comunicación', context: 'Contexto y preguntas de aclaración', content: 'Contenido y fuentes', spam: 'Spam', other: 'Otras' };
+const GUIDE_FIELDS = (cats) => [
+  { k: 'title', label: 'Título corto' },
+  { k: 'text', label: 'Instrucción en lenguaje natural', type: 'textarea', rows: 4, hint: 'Ej.: “Cuando pregunten por un antibiótico, recuerda que requiere receta.” Influye en la respuesta pero no la garantiza: lo que SIEMPRE debe cumplirse va en <b>Escalado</b> o <b>Procedimientos</b>.' },
+  { k: 'category', label: 'Categoría', type: 'select', options: cats.map((c) => [c, CAT_ES[c]]) },
+  { k: 'state', label: 'Estado', type: 'select', options: [['live', 'Publicada'], ['draft', 'Borrador'], ['paused', 'En pausa']] },
+  { k: 'validFrom', label: 'Activa desde (opcional)', type: 'date' }, { k: 'validTo', label: 'Activa hasta (opcional)', type: 'date' },
+];
+VIEWS.guidance = async () => {
+  const g = await T('/guidance');
+  const sel = (id, opts, val) => `<select id="${id}" class="inp w-auto">${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${k === val ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
+  const groups = g.options.categories.map((c) => {
+    const rules = g.rules.filter((r) => r.category === c); if (!rules.length) return '';
+    return `<h3 class="text-sm font-extrabold mt-4 mb-2">${CAT_ES[c]}</h3>` + rules.map((r) => `<div class="card mb-2 flex gap-3 items-start"><div class="flex-1"><div class="flex items-center gap-2"><b class="text-sm">${esc(r.title)}</b>${stateBadge(r.state)}${r.validFrom || r.validTo ? `<span class="text-[11px] text-gray-500">${r.validFrom || '…'} → ${r.validTo || '…'}</span>` : ''}</div><p class="text-sm text-gray-600 mt-1">${esc(r.text)}</p></div>
+      <div class="flex gap-1 whitespace-nowrap"><button class="btn" data-act="g-toggle" data-id="${r.id}" data-id2="${r.state}">${r.state === 'live' ? 'Pausar' : 'Publicar'}</button><button class="btn" data-act="g-edit" data-id="${r.id}">Editar</button><button class="btn btn-danger" data-act="g-del" data-id="${r.id}">✕</button></div></div>`).join('');
+  }).join('');
+  return header('Guidance', 'Instrucciones de comportamiento en lenguaje natural. El bot las lee junto con la pregunta del cliente y el contenido encontrado.', '<button class="btn btn-primary" data-act="g-new"><i class="fa-solid fa-plus"></i> Nueva regla</button>')
+    + `<div class="card flex flex-wrap items-center gap-4"><div><div class="text-xs font-bold text-gray-600 mb-1">Tono de voz</div>${sel('tone', g.options.tones, g.basics.tone)}</div><div><div class="text-xs font-bold text-gray-600 mb-1">Longitud de respuesta</div>${sel('length', g.options.lengths, g.basics.length)}</div><button class="btn btn-primary mt-5" data-act="g-basics">Guardar ajustes</button></div>`
+    + (groups || empty('No hay reglas. Cree la primera con “Nueva regla”.'));
+};
+let GCATS = [];
+ACT['g-basics'] = async () => { await act(() => T('/guidance/basics', { method: 'PUT', body: { tone: $('tone').value, length: $('length').value } }), 'Ajustes guardados'); };
+ACT['g-new'] = async () => { const g = await T('/guidance'); GCATS = g.options.categories;
+  form({ title: 'Nueva regla de Guidance', fields: GUIDE_FIELDS(GCATS), values: { state: 'draft', category: 'communication' }, onSubmit: (v) => T('/guidance/rules', { method: 'POST', body: v }) }); };
+ACT['g-edit'] = async (id) => { const g = await T('/guidance'); form({ title: 'Editar regla', fields: GUIDE_FIELDS(g.options.categories), values: g.rules.find((r) => r.id === id), onSubmit: (v) => T('/guidance/rules/' + id, { method: 'PUT', body: v }) }); };
+ACT['g-toggle'] = async (id, st) => { await act(() => T('/guidance/rules/' + id, { method: 'PUT', body: { state: st === 'live' ? 'paused' : 'live' } }), 'Estado actualizado'); render(); };
+ACT['g-del'] = async (id) => { if (confirmDel('esta regla')) { await act(() => T('/guidance/rules/' + id, { method: 'DELETE' }), 'Eliminada'); render(); } };
+
+/* ---------- Escalado ---------- */
+VIEWS.escalado = async () => {
+  const { rules, intents } = await T('/escalation');
+  const names = Object.fromEntries(intents.map((i) => [i.id, i.name]));
+  const cond = (r) => [r.intent ? `intención = <b>${esc(names[r.intent] || r.intent)}</b>` : '', r.keywords.length ? `dice: <b>${esc(r.keywords.join(', '))}</b>` : '', r.misroutes ? `≥ <b>${r.misroutes}</b> malentendidos` : ''].filter(Boolean).join(' <span class="text-gray-400">y</span> ');
+  const list = rules.map((r) => `<div class="card mb-2 flex gap-3 items-start"><div class="flex-1"><div class="flex items-center gap-2"><b class="text-sm">${esc(r.name)}</b><span class="badge ${r.enabled ? BADGE.live : BADGE.paused}">${r.enabled ? 'Activa' : 'Apagada'}</span><span class="text-[11px] text-gray-500">usada ${r.used || 0} veces</span></div>
+    <p class="text-sm text-gray-600 mt-1">Cuando ${cond(r)} → <b>traspasar a una persona</b>${r.message ? ` con el mensaje “${esc(r.message)}”` : ''}.</p></div>
+    <div class="flex gap-1 whitespace-nowrap"><button class="btn" data-act="e-toggle" data-id="${r.id}" data-id2="${r.enabled}">${r.enabled ? 'Apagar' : 'Activar'}</button><button class="btn" data-act="e-edit" data-id="${r.id}">Editar</button><button class="btn btn-danger" data-act="e-del" data-id="${r.id}">✕</button></div></div>`).join('');
+  const ints = intents.map((i) => `<tr><td><b>${esc(i.name)}</b><div class="text-xs text-gray-500 mono">${esc(i.id)}</div></td><td class="text-xs">${esc(i.description)}</td><td class="text-xs">${esc(i.keywords.join(', '))}</td></tr>`).join('');
+  return header('Escalado', 'Cuándo pasa el bot la conversación a una persona. Estas reglas las evalúa el código, no el modelo: si se cumple la condición, siempre ocurre.', '<button class="btn btn-primary" data-act="e-new"><i class="fa-solid fa-plus"></i> Nueva regla</button>')
+    + (list || empty('Sin reglas de escalado.'))
+    + `<div class="card mt-4 text-sm"><b><i class="fa-solid fa-shield-heart text-brand-600"></i> Safety Guard (siempre activo):</b> mensajes sobre autolesión, abuso o maltrato reciben una respuesta fija con el 911 y se traspasan a una persona. No se puede apagar. Además siguen vigentes las <b>políticas</b> de la Sección D (urgencias médicas, pedir humano, quejas).</div>`
+    + `<div class="flex items-center justify-between mt-6 mb-2"><div><h3 class="font-extrabold">Intenciones (clasificador)</h3><p class="text-xs text-gray-500">Etiqueta cada mensaje con un tema, para usarlo en reglas, procedimientos y reportes.</p></div><button class="btn" data-act="i-edit">Editar intenciones</button></div>`
+    + `<div class="card p-0 overflow-x-auto"><table class="w-full"><thead><tr><th>Intención</th><th>Descripción</th><th>Palabras clave</th></tr></thead><tbody>${ints}</tbody></table></div>`
+    + `<div class="card mt-4"><b class="text-sm">Probar el clasificador</b><div class="flex gap-2 mt-2"><input id="cls-in" class="inp" placeholder="Escriba un mensaje de cliente…" /><button class="btn btn-primary" data-act="i-test">Clasificar</button></div><p id="cls-out" class="text-sm mt-2 text-gray-600"></p></div>`;
+};
+const escFields = (intents) => [
+  { k: 'name', label: 'Nombre de la regla' },
+  { k: 'intent', label: 'Condición: intención del cliente (opcional)', type: 'select', options: [['', '— cualquiera —'], ...intents.map((i) => [i.id, i.name])] },
+  { k: 'keywords', label: 'Condición: el mensaje contiene alguna de estas palabras (opcional)', hint: 'Separadas por coma.' },
+  { k: 'misroutes', label: 'Condición: malentendidos seguidos ≥ (0 = ignorar)', type: 'number' },
+  { k: 'message', label: 'Mensaje al cliente (opcional)', type: 'textarea', rows: 2, hint: 'Si lo deja vacío se usa el mensaje estándar de traspaso.' },
+  { k: 'enabled', label: 'Estado', type: 'checkbox', checkLabel: 'Regla activa' },
+];
+const escBody = (v) => ({ ...v, keywords: v.keywords.split(',').map((x) => x.trim()).filter(Boolean), misroutes: parseInt(v.misroutes, 10) || 0 });
+ACT['e-new'] = async () => { const { intents } = await T('/escalation'); form({ title: 'Nueva regla de escalado', fields: escFields(intents), values: { enabled: true, misroutes: 0 }, onSubmit: (v) => T('/escalation/rules', { method: 'POST', body: escBody(v) }) }); };
+ACT['e-edit'] = async (id) => { const { rules, intents } = await T('/escalation'); form({ title: 'Editar regla', fields: escFields(intents), values: rules.find((r) => r.id === id), onSubmit: (v) => T('/escalation/rules/' + id, { method: 'PUT', body: escBody(v) }) }); };
+ACT['e-toggle'] = async (id, en) => { await act(() => T('/escalation/rules/' + id, { method: 'PUT', body: { enabled: en !== 'true' } }), 'Actualizada'); render(); };
+ACT['e-del'] = async (id) => { if (confirmDel('esta regla')) { await act(() => T('/escalation/rules/' + id, { method: 'DELETE' }), 'Eliminada'); render(); } };
+ACT['i-edit'] = async () => { const { intents } = await T('/escalation');
+  form({ title: 'Editar intenciones', fields: [{ k: 'text', label: 'Una intención por línea: id | nombre | descripción | palabras, clave', type: 'textarea', rows: 12, mono: true, hint: 'Las palabras clave sin tildes funcionan igual. El id no debe tener espacios.' }],
+    values: { text: intents.map((i) => [i.id, i.name, i.description, i.keywords.join(', ')].join(' | ')).join('\n') },
+    onSubmit: (v) => T('/intents', { method: 'PUT', body: { intents: v.text.split('\n').filter((l) => l.trim()).map((l) => { const [id, name, description, kw] = l.split('|').map((x) => x.trim()); return { id, name, description, keywords: (kw || '').split(',') }; }) } }) }); };
+ACT['i-test'] = async () => { const r = await act(() => T('/intents/classify', { method: 'POST', body: { text: $('cls-in').value } })); if (r) $('cls-out').innerHTML = `Intención: <b>${esc(r.intent)}</b>${r.safety ? ` · <span class="text-red-600 font-bold">Safety Guard: ${esc(r.safety.id)}</span>` : ''}`; };
+
+/* ---------- Procedimientos ---------- */
+const PROC_HELP = `Una línea por paso:<br><span class="mono">decir: texto</span> · <span class="mono">preguntar variable: texto</span> · <span class="mono">si variable contiene|es|existe valor -> etiqueta | sino -> otra</span> · <span class="mono">etiqueta: nombre</span> · <span class="mono">ir a: nombre</span> · <span class="mono">traspasar: texto</span> · <span class="mono">fin: texto</span>.<br>Use <span class="mono">{{variable}}</span> en los textos. Las líneas con # son comentarios. El cliente puede escribir “cancelar” para salir.`;
+const PROC_FIELDS = (intents) => [
+  { k: 'name', label: 'Nombre' },
+  { k: 'keywords', label: 'Se activa cuando el cliente dice… (palabras o frases clave)', hint: 'Separadas por coma. Ej.: pedido a domicilio, que me lo traigan' },
+  { k: 'intent', label: 'o cuando su intención es… (opcional)', type: 'select', options: [['', '— ninguna —'], ...intents.map((i) => [i.id, i.name])] },
+  { k: 'script', label: 'Pasos', type: 'textarea', rows: 12, mono: true, hint: PROC_HELP },
+  { k: 'state', label: 'Estado', type: 'select', options: [['draft', 'Borrador'], ['live', 'Publicado'], ['paused', 'En pausa']] },
+];
+VIEWS.procedimientos = async () => {
+  const { procedures } = await T('/procedures');
+  const list = procedures.map((p) => `<div class="card mb-2 flex gap-3 items-start"><div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><b class="text-sm">${esc(p.name)}</b>${stateBadge(p.state)}<span class="text-[11px] text-gray-500">iniciado ${p.stats.started} · completado ${p.stats.completed} · traspasado ${p.stats.handoffs}</span></div>
+    <p class="text-xs text-gray-500 mt-1">Disparadores: ${esc(csv(p.keywords)) || '—'}${p.intent ? ' · intención ' + esc(p.intent) : ''}</p></div>
+    <div class="flex gap-1 whitespace-nowrap"><button class="btn" data-act="p-preview" data-id="${p.id}"><i class="fa-solid fa-play"></i> Probar</button><button class="btn" data-act="p-edit" data-id="${p.id}">Editar</button><button class="btn btn-danger" data-act="p-del" data-id="${p.id}">✕</button></div></div>`).join('');
+  return header('Procedimientos', 'Flujos paso a paso: el bot pregunta datos, decide por ramas y puede traspasar a una persona con un resumen de lo recogido. Úselos cuando haya datos que recoger o decisiones por rama.', '<button class="btn btn-primary" data-act="p-new"><i class="fa-solid fa-plus"></i> Nuevo procedimiento</button>')
+    + (list || empty('Aún no hay procedimientos.'))
+    + `<p class="text-xs text-gray-500 mt-3">Guidance cambia <i>cómo habla</i> el bot; un Procedimiento cambia <i>qué hace</i>, paso a paso. El resumen que recoge un traspaso queda en la conversación (campo <span class="mono">fsm.summary</span>).</p>`;
+};
+ACT['p-new'] = async () => { const { intents } = await T('/escalation'); form({ title: 'Nuevo procedimiento', fields: PROC_FIELDS(intents), values: { state: 'draft', script: 'preguntar nombre: ¿Cómo se llama?\ndecir: Mucho gusto, {{nombre}}.\nfin: ¡Gracias! 💙' }, onSubmit: (v) => T('/procedures', { method: 'POST', body: { ...v, keywords: v.keywords.split(',').map((x) => x.trim()).filter(Boolean) } }) }); };
+ACT['p-edit'] = async (id) => { const [{ procedures }, { intents }] = await Promise.all([T('/procedures'), T('/escalation')]); form({ title: 'Editar procedimiento', fields: PROC_FIELDS(intents), values: procedures.find((p) => p.id === id), onSubmit: (v) => T('/procedures/' + id, { method: 'PUT', body: { ...v, keywords: v.keywords.split(',').map((x) => x.trim()).filter(Boolean) } }) }); };
+ACT['p-del'] = async (id) => { if (confirmDel('este procedimiento')) { await act(() => T('/procedures/' + id, { method: 'DELETE' }), 'Eliminado'); render(); } };
+ACT['p-preview'] = (id) => form({ title: 'Probar procedimiento', submit: 'Simular', fields: [{ k: 'inputs', label: 'Respuestas del cliente de ejemplo (una por línea, en orden)', type: 'textarea', rows: 4, hint: 'Se simula sin tocar ninguna conversación real.' }],
+  onSubmit: async (v) => { const r = await T(`/procedures/${id}/preview`, { method: 'POST', body: { inputs: v.inputs.split('\n').filter((x) => x.trim()) } });
+    setTimeout(() => info('Simulación', `<div class="space-y-2">${r.transcript.map((t) => `<div class="text-sm ${t.from === 'cliente' ? 'text-right' : ''}"><span class="inline-block px-3 py-2 rounded-xl ${t.from === 'cliente' ? 'bg-emerald-100' : t.from === 'bot' ? 'bg-gray-100' : 'bg-amber-50 text-amber-800 text-xs'}">${esc(t.text).replace(/\n/g, '<br>')}</span></div>`).join('')}</div><p class="text-xs text-gray-500 mt-3">Datos recogidos: <span class="mono">${esc(JSON.stringify(r.data))}</span></p>`), 50); return r; } });
+
+/* ---------- Test ---------- */
+let testGroup = null;
+const OUT_ES = { ia: 'Respondió la IA', escalado: 'Escaló a persona', procedimiento: 'Inició procedimiento', fallback: 'Sin respuesta', seguridad: 'Safety Guard' };
+const RATE = { good: ['Bien', 'bg-emerald-100 text-emerald-700'], acceptable: ['Aceptable', 'bg-amber-100 text-amber-700'], poor: ['Mal', 'bg-red-100 text-red-700'] };
+VIEWS.test = async () => {
+  const { groups } = await T('/tests');
+  if (!groups.length) return header('Test', 'Banco de preguntas para comprobar al bot antes y después de cada cambio.', '<button class="btn btn-primary" data-act="t-newgroup">Nuevo grupo</button>') + empty('Cree un grupo de preguntas.');
+  if (!groups.some((g) => g.id === testGroup)) testGroup = groups[0].id;
+  const g = groups.find((x) => x.id === testGroup);
+  const rows = g.questions.map((q) => {
+    const l = q.last; const shown = q.rating || (l && l.autoRating);
+    return `<tr><td class="max-w-[16rem]"><b>${esc(q.q)}</b><div class="text-[11px] text-gray-500">${q.expect.length ? 'Debe contener: ' + esc(q.expect.join(', ')) : ''}${q.expectOutcome ? ' Debe: ' + esc(q.expectOutcome) : ''}</div></td>
+      <td class="max-w-[22rem]">${l ? `<div class="text-xs">${esc(l.answer.slice(0, 160))}${l.answer.length > 160 ? '…' : ''}</div><div class="text-[11px] text-gray-500 mt-1">${OUT_ES[l.outcome] || l.outcome} · ${esc(l.provider)}${l.sources.length ? ' · 📚 ' + esc(l.sources.map((s) => s.title).join(', ')) : ''}${l.rules.length ? ' · ⚙ ' + esc(l.rules.join(', ')) : ''}</div>` : '<span class="text-gray-400 text-xs">Sin ejecutar</span>'}</td>
+      <td>${shown ? `<span class="badge ${RATE[shown][1]}">${RATE[shown][0]}</span>${q.rating ? '' : '<div class="text-[10px] text-gray-400">automática</div>'}` : '<span class="text-gray-400 text-xs">Sin valorar</span>'}</td>
+      <td class="whitespace-nowrap text-xs"><button class="btn" data-act="t-run" data-id="${q.id}">▶</button> <button class="btn" data-act="t-eval" data-id="${q.id}">Evaluar</button> <button class="btn btn-danger" data-act="t-delq" data-id="${q.id}">✕</button></td></tr>`;
+  }).join('');
+  const counts = { good: 0, acceptable: 0, poor: 0 }; g.questions.forEach((q) => { const s = q.rating || (q.last && q.last.autoRating); if (s) counts[s]++; });
+  return header('Test', 'Corra las mismas preguntas tras cada cambio de contenido o reglas y compare las valoraciones. Máximo 50 por grupo.',
+    `<select id="grp" class="inp w-auto">${groups.map((x) => `<option value="${x.id}" ${x.id === testGroup ? 'selected' : ''}>${esc(x.name)} (${x.questions.length})</option>`).join('')}</select><button class="btn" data-act="t-newgroup">Nuevo grupo</button><button class="btn btn-danger" data-act="t-delgroup">Borrar grupo</button>`)
+    + `<div class="flex flex-wrap gap-2 mb-3 items-center"><button class="btn btn-primary" data-act="t-runall"><i class="fa-solid fa-play"></i> Ejecutar todas</button><button class="btn" data-act="t-newq"><i class="fa-solid fa-plus"></i> Nueva pregunta</button><button class="btn" data-act="t-csv"><i class="fa-solid fa-download"></i> Informe CSV</button><span id="prog" class="text-xs text-gray-500"></span><span class="ml-auto text-xs"><span class="badge ${RATE.good[1]}">Bien ${counts.good}</span> <span class="badge ${RATE.acceptable[1]}">Aceptable ${counts.acceptable}</span> <span class="badge ${RATE.poor[1]}">Mal ${counts.poor}</span></span></div>`
+    + (g.questions.length ? `<div class="card p-0 overflow-x-auto"><table class="w-full"><thead><tr><th>Pregunta</th><th>Respuesta del bot</th><th>Valoración</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : empty('Grupo vacío. Agregue preguntas reales de clientes.'));
+};
+AFTER.test = () => { const s = $('grp'); if (s) s.addEventListener('change', () => { testGroup = s.value; render(); }); };
+const QFIELDS = [
+  { k: 'q', label: 'Pregunta del cliente' },
+  { k: 'expect', label: 'La respuesta debe contener (opcional)', hint: 'Palabras separadas por coma. Si faltan, se valora “Mal” automáticamente.' },
+  { k: 'expectOutcome', label: 'o el resultado esperado (opcional)', type: 'select', options: [['', '— ninguno —'], ['escalado', 'Debe escalar a una persona'], ['procedimiento', 'Debe iniciar un procedimiento'], ['ia', 'Debe responder la IA']] },
+];
+ACT['t-newgroup'] = () => form({ title: 'Nuevo grupo de pruebas', fields: [{ k: 'name', label: 'Nombre' }], onSubmit: async (v) => { const g = await T('/tests', { method: 'POST', body: v }); testGroup = g.id; return g; } });
+ACT['t-delgroup'] = async () => { if (confirmDel('este grupo')) { await act(() => T('/tests/' + testGroup, { method: 'DELETE' }), 'Grupo eliminado'); testGroup = null; render(); } };
+ACT['t-newq'] = () => form({ title: 'Nueva pregunta', fields: QFIELDS, onSubmit: (v) => T(`/tests/${testGroup}/questions`, { method: 'POST', body: v }) });
+ACT['t-delq'] = async (id) => { await act(() => T(`/tests/${testGroup}/questions/${id}`, { method: 'DELETE' })); render(); };
+ACT['t-run'] = async (id, _x, el) => { el.disabled = true; el.textContent = '…'; await act(() => T(`/tests/${testGroup}/questions/${id}/run`, { method: 'POST' })); render(); };
+ACT['t-runall'] = async () => {
+  const { groups } = await T('/tests'); const g = groups.find((x) => x.id === testGroup); let n = 0;
+  for (const q of g.questions) { $('prog').textContent = `Ejecutando ${++n}/${g.questions.length}…`; await act(() => T(`/tests/${testGroup}/questions/${q.id}/run`, { method: 'POST' })); }
+  toast('Pruebas completadas'); render();
+};
+ACT['t-csv'] = async () => { const res = await act(() => api(`/training/tests/${testGroup}/export.csv`, { raw: true })); if (!res) return; const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = 'test-botiquin.csv'; a.click(); };
+ACT['t-eval'] = async (id) => {
+  const { groups } = await T('/tests'); const q = groups.find((x) => x.id === testGroup).questions.find((x) => x.id === id); const l = q.last;
+  info('Evaluar respuesta', `<p class="text-sm"><b>Pregunta:</b> ${esc(q.q)}</p>${l ? `<p class="text-sm mt-2 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">${esc(l.answer)}</p>
+    <div class="text-xs text-gray-600 mt-3 space-y-1"><div><b>Resultado:</b> ${OUT_ES[l.outcome] || l.outcome} (${esc(l.provider)}${l.model && l.model !== '-' ? ' / ' + esc(l.model) : ''})</div><div><b>Intención detectada:</b> ${esc(l.intent)}</div><div><b>Contenido usado:</b> ${l.sources.length ? esc(l.sources.map((s) => s.title).join(', ')) : 'ninguno'}</div><div><b>Reglas aplicadas:</b> ${l.rules.length ? esc(l.rules.join(', ')) : 'ninguna'}</div></div>` : '<p class="text-sm text-gray-500 mt-2">Aún no se ha ejecutado.</p>'}
+    <div class="mt-4 grid gap-2"><div class="flex gap-2">${['good', 'acceptable', 'poor'].map((r) => `<button class="btn ${q.rating === r ? 'btn-primary' : ''}" data-rate="${r}">${RATE[r][0]}</button>`).join('')}<button class="btn" data-rate="">Quitar</button></div><textarea id="qnote" class="inp" rows="2" placeholder="Nota interna (qué corregir)">${esc(q.note)}</textarea><button class="btn btn-primary w-fit" id="qsave">Guardar nota</button></div>
+    <p class="text-xs text-gray-500 mt-3">Si la respuesta está mal, corrija el <b>Contenido</b> o la <b>Guidance</b> que usó y vuelva a ejecutar la pregunta.</p>`);
+  const save = async (rating) => { await act(() => T(`/tests/${testGroup}/questions/${id}`, { method: 'PUT', body: { rating: rating === undefined ? q.rating : rating || null, note: $('qnote').value } }), 'Guardado'); closeModal(); render(); };
+  $('modal').querySelectorAll('[data-rate]').forEach((b) => b.addEventListener('click', () => save(b.dataset.rate)));
+  $('qsave').addEventListener('click', () => save());
+};
+
+/* ---------- Recomendaciones ---------- */
+const REASON = { 'ia-sin-respuesta': 'La IA no pudo responder', 'menu-no-entendido': 'No entendió en el menú', 'sucursal-no-entendido': 'No entendió al elegir sucursal' };
+VIEWS.recomendaciones = async () => {
+  const { recommendations: recs } = await T('/recommendations');
+  const cards = recs.map((r) => `<div class="card mb-2"><div class="flex items-start gap-3"><div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="badge bg-violet-100 text-violet-700">Falta contenido</span><span class="badge bg-gray-100 text-gray-600">${r.count} ${r.count === 1 ? 'vez' : 'veces'}</span><span class="text-[11px] text-gray-500">${esc(REASON[r.reason] || r.reason)} · última: ${fmtDate(r.lastAt)}</span></div>
+    <p class="font-bold text-sm mt-1">“${esc(r.question)}”</p>${r.examples.length > 1 ? `<p class="text-xs text-gray-500 mt-1">Otras formas: ${esc(r.examples.slice(1).join(' · '))}</p>` : ''}</div>
+    <div class="flex gap-1 whitespace-nowrap"><button class="btn btn-primary" data-act="r-add" data-id="${r.id}">Enseñar respuesta</button><button class="btn btn-danger" data-act="r-rej" data-id="${r.id}">Rechazar</button></div></div></div>`).join('');
+  return header('Recomendaciones', 'Preguntas reales que el bot no supo responder, ordenadas por frecuencia. Escriba la respuesta correcta y el bot la sabrá desde la siguiente conversación (siempre aprueba una persona).')
+    + (cards || empty('🎉 No hay huecos de conocimiento abiertos. Cuando un cliente haga una pregunta que el bot no pueda responder, aparecerá aquí.'));
+};
+ACT['r-add'] = async (id) => { const { recommendations: recs } = await T('/recommendations'); const r = recs.find((x) => x.id === id);
+  form({ title: 'Enseñar la respuesta', submit: 'Agregar como contenido', fields: [
+    { k: 'title', label: 'Título' }, { k: 'content', label: 'Respuesta correcta', type: 'textarea', rows: 5, hint: 'Escriba solo hechos verdaderos del negocio.' },
+    { k: 'keywords', label: 'Palabras clave (coma)' }, { k: 'type', label: 'Tipo', type: 'select', options: [['snippet', 'Snippet'], ['public', 'Artículo público'], ['internal', 'Artículo interno']] },
+    { k: 'publish', label: 'Estado', type: 'checkbox', checkLabel: 'Publicar de una vez (si no, queda como borrador)' }],
+    values: { title: r.question, publish: true, type: 'snippet', keywords: '' }, onSubmit: (v) => T(`/recommendations/${id}/add`, { method: 'POST', body: v }) }); };
+ACT['r-rej'] = async (id) => { await act(() => T(`/recommendations/${id}/reject`, { method: 'POST' }), 'Rechazada'); render(); };
+
+/* ---------- Análisis ---------- */
+let days = 30;
+VIEWS.analisis = async () => {
+  const a = await T('/analytics?days=' + days);
+  const kpi = (t, v, s, c = 'text-gray-900') => `<div class="card"><div class="text-xs font-bold text-gray-500">${t}</div><div class="text-3xl font-extrabold ${c}">${v}</div><div class="text-xs text-gray-500">${s}</div></div>`;
+  const bars = (list, label, max = Math.max(1, ...list.map((x) => x.count))) => list.length ? list.map((x) => `<div class="mb-2"><div class="flex justify-between text-xs"><span>${esc(label(x))}</span><b>${x.count}</b></div><div class="h-2 bg-gray-100 rounded"><div class="h-2 bg-brand-500 rounded" style="width:${Math.round(x.count / max * 100)}%"></div></div></div>`).join('') : '<p class="text-xs text-gray-400">Sin datos aún.</p>';
+  return header('Análisis', 'Cómo lo está haciendo el bot, calculado con las conversaciones reales y del simulador.', `<select id="days" class="inp w-auto">${[7, 30, 90].map((d) => `<option value="${d}" ${d === days ? 'selected' : ''}>Últimos ${d} días</option>`).join('')}</select>`)
+    + `<div class="grid sm:grid-cols-4 gap-3 mb-4">${kpi('Mensajes atendidos', a.total, 'en el período')}${kpi('Automatización', a.automationRate + '%', `${a.automated} resueltos por el bot`, 'text-brand-700')}${kpi('Escalado a personas', a.escalationRate + '%', `${a.escalated} traspasos`, 'text-amber-600')}${kpi('Sin respuesta', a.fallbackRate + '%', `${a.fallback} huecos`, 'text-red-600')}</div>`
+    + `<div class="grid lg:grid-cols-2 gap-3"><div class="card"><b class="text-sm">Resultado de cada mensaje</b><div class="mt-3">${bars(a.byOutcome, (x) => OUT_ES[x.key] || { menu: 'Menú guiado', 'procedimiento-fin': 'Procedimiento completado', 'procedimiento-traspaso': 'Procedimiento → persona' }[x.key] || x.key)}</div></div>
+      <div class="card"><b class="text-sm">Temas más frecuentes (intención)</b><div class="mt-3">${bars(a.topIntents, (x) => x.name)}</div></div>
+      <div class="card"><b class="text-sm">Preguntas sin respuesta (abiertas)</b><div class="mt-3">${bars(a.openGaps, (x) => x.question)}</div></div>
+      <div class="card"><b class="text-sm">Contenido más usado</b><div class="mt-3">${bars(a.topArticles.map((x) => ({ ...x, count: x.used })), (x) => x.title)}</div></div></div>`
+    + `<div class="card mt-3"><b class="text-sm">Procedimientos</b><div class="mt-2 overflow-x-auto"><table class="w-full"><thead><tr><th>Procedimiento</th><th>Estado</th><th>Iniciados</th><th>Completados</th><th>Traspasos</th></tr></thead><tbody>${a.procedures.map((p) => `<tr><td>${esc(p.name)}</td><td>${stateBadge(p.state)}</td><td>${p.started}</td><td>${p.completed}</td><td>${p.handoffs}</td></tr>`).join('')}</tbody></table></div></div>`;
+};
+AFTER.analisis = () => $('days').addEventListener('change', (e) => { days = parseInt(e.target.value, 10); render(); });
+
+/* ---------- Changelog ---------- */
+VIEWS.changelog = async () => {
+  const { entries } = await T('/changelog?limit=200');
+  return header('Changelog', 'Registro de todo lo que cambió en el entrenamiento del bot: cuándo, qué y de qué tipo.')
+    + (entries.length ? `<div class="card p-0 overflow-x-auto"><table class="w-full"><thead><tr><th>Fecha</th><th>Área</th><th>Cambio</th><th>Elemento</th></tr></thead><tbody>${entries.map((c) => `<tr><td class="whitespace-nowrap text-xs">${fmtDate(c.ts)}</td><td><span class="badge bg-gray-100 text-gray-700">${esc(c.area)}</span></td><td>${esc(c.action)}</td><td>${esc(c.item)}</td></tr>`).join('')}</tbody></table></div>` : empty('Todavía no hay cambios registrados.'));
+};
+
+/* ===== Arranque ===== */
+(async () => { try { const h = await api('/health'); const s = $('ai-status'); s.textContent = h.ai?.live ? 'IA conectada' : 'Modo demo · sin IA'; s.className = 'hidden sm:inline-block badge ' + (h.ai?.live ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'); } catch { /* el render mostrará el error */ } })();
+render();
+</script>
+</body>
+</html>

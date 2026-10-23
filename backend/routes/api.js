@@ -12,15 +12,9 @@ const wa = require('../services/whatsappService');
 const kb = require('../services/knowledgeService');
 const { normalize } = require('../utils/phone');
 const log = require('../utils/logger');
+const requireAdmin = require('../utils/adminAuth');
 
 const router = express.Router();
-
-/* Autenticacion de las rutas administrativas via cabecera X-Admin-Token. */
-function requireAdmin(req, res, next) {
-  if (!config.admin.token) return next(); // sin token configurado (dev) = abierto
-  if (req.get('x-admin-token') === config.admin.token) return next();
-  return res.status(401).json({ error: 'No autorizado: falta o es invalido el header X-Admin-Token' });
-}
 
 /* Limite de peticiones al backend de IA desde el navegador. */
 const chatLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });

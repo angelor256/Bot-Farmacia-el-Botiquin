@@ -69,17 +69,36 @@ const DEFAULT_MAP = {
 /* ---------------- Normalización / validación ---------------- */
 const normPhone = (p) => String(p || '').replace(/[^\d+]/g, '').replace(/^\+?0{0,2}(506)?/, '').slice(-8);
 
-function normalizeArticle(a = {}, i = 0) {
-  const title = String(a.title || `Artículo ${i + 1}`).trim().slice(0, 200);
+const ARTICLE_TYPES = ['public', 'internal', 'snippet'];
+
+function normalizeArticle(a = {}, i = 0, prev = {}) {
+  // Los campos que no llegan en el payload se conservan del artículo previo (mismo id).
+  const g = (k, d) => (a[k] !== undefined ? a[k] : prev[k] !== undefined ? prev[k] : d);
+  const title = String(a.title || prev.title || `Artículo ${i + 1}`).trim().slice(0, 200);
+  const kw = a.keywords !== undefined ? a.keywords : prev.keywords;
   return {
-    id: a.id || 'kb-' + Math.random().toString(36).slice(2, 9),
+    id: a.id || prev.id || 'kb-' + Math.random().toString(36).slice(2, 9),
     title,
-    content: String(a.content || '').trim().slice(0, 4000),
-    keywords: Array.isArray(a.keywords) ? a.keywords.map((k) => String(k).toLowerCase().trim()).filter(Boolean).slice(0, 15)
+    content: String(g('content', '')).trim().slice(0, 4000),
+    keywords: Array.isArray(kw) ? kw.map((k) => String(k).toLowerCase().trim()).filter(Boolean).slice(0, 15)
       : title.toLowerCase().split(/[^a-z0-9áéíóúñ]+/).filter((w) => w.length > 3).slice(0, 8),
-    category: a.category || 'general',
-    enabled: a.enabled !== false,
+    category: g('category', 'general') || 'general',
+    enabled: g('enabled', true) !== false,
+    type: ARTICLE_TYPES.includes(g('type')) ? g('type') : 'public',
+    state: g('state') === 'draft' ? 'draft' : 'live',
+    validFrom: g('validFrom', null) || null,
+    validTo: g('validTo', null) || null,
+    used: Number(g('used', 0)) || 0,
+    updatedAt: a.updatedAt || prev.updatedAt || null,
   };
+}
+
+/** ¿El artículo puede usarse AHORA? (publicado + dentro de su ventana de vigencia). */
+function isActive(a, now = Date.now()) {
+  if (!a || a.enabled === false || a.state === 'draft') return false;
+  if (a.validFrom && now < Date.parse(a.validFrom)) return false;
+  if (a.validTo && now > Date.parse(a.validTo) + 86399999) return false; // incluye todo el día final
+  return true;
 }
 
 function normalizePolicy(p = {}) {
@@ -111,7 +130,7 @@ function normalizePayload(input = {}) {
   const out = {};
   if (input.articles) {
     if (!Array.isArray(input.articles)) throw new Error('knowledge.articles debe ser un arreglo');
-    out.articles = input.articles.slice(0, 100).map(normalizeArticle);
+    out.articles = input.articles.slice(0, 300).map((a, i) => normalizeArticle(a, i, kb.articles.find((x) => x.id === a.id) || {}));
   }
   if (input.policies) {
     if (!Array.isArray(input.policies)) throw new Error('knowledge.policies debe ser un arreglo');
@@ -140,6 +159,38 @@ function setKnowledge(patch) {
   return getKnowledge();
 }
 
+/* ---------------- CRUD por artículo (panel de entrenamiento) ---------------- */
+function addArticle(input) {
+  const art = normalizeArticle({ ...input, id: undefined }, kb.articles.length);
+  art.updatedAt = new Date().toISOString();
+  kb = { ...kb, articles: [...kb.articles, art], updatedAt: art.updatedAt };
+  schedulePersist();
+  return art;
+}
+function updateArticle(id, patch) {
+  const prev = kb.articles.find((x) => x.id === id);
+  if (!prev) return null;
+  const art = normalizeArticle({ ...patch, id }, 0, prev);
+  art.updatedAt = new Date().toISOString();
+  art.used = prev.used; // el contador de uso no se edita a mano
+  kb = { ...kb, articles: kb.articles.map((x) => (x.id === id ? art : x)), updatedAt: art.updatedAt };
+  schedulePersist();
+  return art;
+}
+function removeArticle(id) {
+  const prev = kb.articles.find((x) => x.id === id);
+  if (!prev) return null;
+  kb = { ...kb, articles: kb.articles.filter((x) => x.id !== id), updatedAt: new Date().toISOString() };
+  schedulePersist();
+  return prev;
+}
+/** Cuenta cuántas veces se usó cada artículo para responder (métrica "Reports" de Fin). */
+function markUsed(ids = []) {
+  let n = 0;
+  for (const a of kb.articles) if (ids.includes(a.id)) { a.used = (a.used || 0) + 1; n++; }
+  if (n) schedulePersist();
+}
+
 /* ---------------- Recuperación ligera (RAG sin embeddings) ---------------- */
 /**
  * Busca los artículos más relevantes para un mensaje por coincidencia de
@@ -152,7 +203,7 @@ function retrieve(message, { topK = 3, minScore = 1 } = {}) {
   const words = q.split(/[^a-z0-9áéíóúñ]+/).filter((w) => w.length >= 4);
   const scored = [];
   for (const a of kb.articles) {
-    if (!a.enabled || !a.content) continue;
+    if (!isActive(a) || !a.content) continue;
     let score = 0;
     for (const k of a.keywords) if (k && q.includes(k)) score += 2;
     for (const w of words) if (a.title.toLowerCase().includes(w) || a.content.toLowerCase().includes(w)) score += 1;
@@ -160,7 +211,7 @@ function retrieve(message, { topK = 3, minScore = 1 } = {}) {
   }
   scored.sort((x, y) => y.score - x.score);
   return scored.slice(0, topK).map(({ article: a, score }) => ({
-    title: a.title, category: a.category, score,
+    id: a.id, title: a.title, category: a.category, score,
     excerpt: a.content.length > 700 ? a.content.slice(0, 700) + '…' : a.content,
   }));
 }
@@ -248,7 +299,7 @@ function schedulePersist() {
   try {
     if (!fs.existsSync(FILE)) return;
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    kb = { articles: (data.articles || []).map(normalizeArticle), policies: data.policies || null, map: data.map || null, updatedAt: data.updatedAt || null };
+    kb = { articles: (data.articles || []).map((a, i) => normalizeArticle(a, i)), policies: data.policies || null, map: data.map || null, updatedAt: data.updatedAt || null };
     log.info(`[knowledge] ${kb.articles.length} artículos restaurados desde disco`);
   } catch (err) {
     log.warn('[knowledge] snapshot ilegible, se inicia vacío:', err.message);
@@ -256,7 +307,7 @@ function schedulePersist() {
 })();
 
 module.exports = {
-  getKnowledge, setKnowledge, normalizePayload, validateMap,
+  getKnowledge, setKnowledge, addArticle, updateArticle, removeArticle, markUsed, isActive, normalizePayload, validateMap,
   retrieve, detectEscalation, buildKnowledgePromptPart,
   policiesToPromptText, mapToPromptText, normPhone,
   DEFAULT_POLICIES, DEFAULT_MAP,
