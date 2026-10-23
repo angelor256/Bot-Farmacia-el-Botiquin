@@ -133,7 +133,7 @@ function bumpMisroutes(rawPhone) {
 
 /** Reinicia el flujo de un usuario (botón "Reiniciar chat" del panel). */
 function resetUser(rawPhone) {
-  const key = phoneUtil.normalize(rawPhone);
+  const key = userKey(rawPhone);
   const u = users.get(key);
   if (!u) return false;
   u.fsm = { state: 0, option: null, branch: null, misroutes: 0 };
@@ -179,6 +179,6 @@ loadSnapshot();
 
 module.exports = {
   appendMessage, getRecentHistory, getConversation, listContacts,
-  pauseBot, resumeBot, isBotEnabled, setFsmState, ensureShape, bumpMisroutes, resetUser,
+  userKey, pauseBot, resumeBot, isBotEnabled, setFsmState, ensureShape, bumpMisroutes, resetUser,
   __test: { users, writeSnapshot },
 };

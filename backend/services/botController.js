@@ -65,7 +65,7 @@ async function replyTo(phone, text) {
 /* ---------- FSM por telefono (los números del menú SIEMPRE tienen prioridad) ---------- */
 function handleOptionChoice(phone, msg) {
   if (msg === '1' || msg === '2') {
-    store.setFsmState(phone, { state: 2, option: OPTION_NAMES[msg] });
+    store.setFsmState(phone, { state: 2, option: OPTION_NAMES[msg], misroutes: 0 });
     return MSG_BRANCHES;
   }
   if (GREETING_RE.test(msg)) return '¡Hola! 👋😊 Qué gusto saludarle. 💙🧡\n\nPara ayudarle, digite el número de la opción:\n\n' + MENU;
@@ -76,7 +76,7 @@ function handleOptionChoice(phone, msg) {
   }
   if (msg === '4') return 'Muchas gracias por ayudarnos a mejorar 🙏\n\nEscriba su sugerencia y el equipo de El Botiquin la revisara personalmente. 💙';
   if (msg === '5') {
-    store.setFsmState(phone, { state: 2, option: OPTION_NAMES[1] });
+    store.setFsmState(phone, { state: 2, option: OPTION_NAMES[1], misroutes: 0 });
     return '📍 *Nuestras sucursales*\n\n🏥 Pavas Centro - Frente a la feria del farmer, L-20\n🏥 Lomas del Rio - 100 m sur de la entrada principal\n\n🕐 Lun-Sab 7:00-22:00 · Dom 8:00-20:00\n\nDigite 1 o 2 para hacer un pedido en una de ellas. 💊';
   }
   // Mensaje libre en estado de menú: antes solo decía "no entendí" y el usuario
@@ -92,7 +92,7 @@ function handleOptionChoice(phone, msg) {
 function handleBranchChoice(phone, msg) {
   if (msg === '1' || msg === '2') {
     const branch = BRANCH_NAMES[msg];
-    store.setFsmState(phone, { state: 3, branch });
+    store.setFsmState(phone, { state: 3, branch, misroutes: 0 });
     return '¡Perfecto! 😊 Sera un gusto atenderle desde nuestra Sucursal ' + branch + '. 💙\n\nCuenteme, ¿en que le puedo ayudar?';
   }
   store.bumpMisroutes(phone);

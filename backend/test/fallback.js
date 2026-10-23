@@ -30,12 +30,12 @@ function freshGateway() {
   // 1) Gemini modelo A -> 404 (modelo retirado): descarta A sin reintentos y prueba B.
   calls = []; scenario = [
     { status: 404, body: { error: { message: 'Model gemini-3.8-flash is not found for api version v1beta' } } },
-    { status: 200, body: { candidates: [{ content: { parts: [{ text: 'Hola desde Gemini 2.0 Flash' }] } }] } },
+    { status: 200, body: { candidates: [{ content: { parts: [{ text: 'Hola desde Gemini 3.5 Flash Lite' }] } }] } },
   ];
   let out = await run();
-  assert.strictEqual(out.text, 'Hola desde Gemini 2.0 Flash');
+  assert.strictEqual(out.text, 'Hola desde Gemini 3.5 Flash Lite');
   assert.strictEqual(out.provider, 'gemini');
-  assert.strictEqual(out.model, 'gemini-2.0-flash');
+  assert.strictEqual(out.model, 'gemini-3.5-flash-lite');
   assert.strictEqual(out.degraded, true);
   assert.strictEqual(calls.length, 2);
   console.log('OK  404 en modelo retirado -> pasa al siguiente:', calls.map(geminiModel).join(' -> '));

@@ -30,7 +30,7 @@ module.exports = {
         // Cadena de modelos: si uno devuelve 404/429/"retirado", se prueba el siguiente.
         models: list(process.env.GEMINI_MODELS).length
           ? list(process.env.GEMINI_MODELS)
-          : ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
+          : ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
       },
       groq: {
         enabled: !!process.env.GROQ_API_KEY,

@@ -58,24 +58,25 @@ router.get('/conversations/:phone', requireAdmin, (req, res) => {
 
 /* OBJETIVO #3: tomar el chat (pausar el bot) / devolverlo al bot. */
 router.post('/conversations/:phone/pause', requireAdmin, (req, res) => {
-  const phone = normalize(req.params.phone);
+  const phone = store.userKey(req.params.phone);
   if (!phone) return res.status(400).json({ error: 'Numero de telefono invalido' });
   res.json({ ok: true, botPaused: store.pauseBot(phone, { pausedBy: req.body?.pausedBy || 'agente', reason: req.body?.reason || '' }) });
 });
 
 router.post('/conversations/:phone/resume', requireAdmin, (req, res) => {
-  const phone = normalize(req.params.phone);
+  const phone = store.userKey(req.params.phone);
   if (!phone) return res.status(400).json({ error: 'Numero de telefono invalido' });
-  res.json({ ok: true, botPaused: false });
   store.resumeBot(phone);
+  res.json({ ok: true, botPaused: false });
 });
 
 /* El agente humano responde por WhatsApp desde el panel. */
 router.post('/conversations/:phone/reply', requireAdmin, async (req, res) => {
-  const phone = normalize(req.params.phone);
+  const phone = store.userKey(req.params.phone);
   const text = String(req.body?.text || '').trim();
   if (!phone || !text) return res.status(400).json({ error: 'Faltan "phone" o "text"' });
   store.appendMessage(phone, 'model', text, { via: 'human' });
+  if (!normalize(phone)) return res.json({ ok: true, simulated: true }); // id de sesión del simulador: no hay WhatsApp real
   const r = await wa.sendText(phone, text);
   res.status(r.ok ? 200 : 502).json(r);
 });
@@ -130,7 +131,7 @@ router.post('/knowledge/test', requireAdmin, (req, res) => {
 
 /* Reiniciar el flujo de un usuario concreto (deja de estar pausado también). */
 router.post('/conversations/:phone/reset', requireAdmin, (req, res) => {
-  const phone = normalize(req.params.phone);
+  const phone = store.userKey(req.params.phone);
   if (!phone) return res.status(400).json({ error: 'Numero de telefono invalido' });
   res.json({ ok: store.resetUser(phone), phone });
 });
